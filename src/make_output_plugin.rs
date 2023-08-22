@@ -1,16 +1,11 @@
-use crate::{
-    err_or_ignore, msg, Cfg, Creature, Item, LastList, Log, MsgTone, PluginInfo, PluginName,
-    ResponsiblePlugins, Subrecord,
-};
+use crate::{err_or_ignore, msg, Cfg, Creature, Item, LastList, Log, MsgTone, PluginInfo, PluginName, ResponsiblePlugins, Subrecord};
 use anyhow::{anyhow, Result};
 use std::{
     cmp::max,
     collections::{hash_map::Entry, HashMap},
     path::Path,
 };
-use tes3::esp::{
-    FileType, FixedString, Header, LeveledCreature, LeveledItem, ObjectFlags, Plugin, TES3Object,
-};
+use tes3::esp::{FileType, FixedString, Header, LeveledCreature, LeveledItem, ObjectFlags, Plugin, TES3Object};
 
 #[derive(Default)]
 pub(crate) struct ListCounts {
@@ -147,20 +142,12 @@ macro_rules! make_lists {
                             &mut $helper,
                         )?;
                     }
-                    $name.sort_by(|(name1, _), (name2, _)| {
-                        name1.to_lowercase().cmp(&name2.to_lowercase())
-                    });
+                    $name.sort_by(|(name1, _), (name2, _)| name1.to_lowercase().cmp(&name2.to_lowercase()));
                     $name.sort_by_key(|level| level.1);
                 }
 
                 if $helper.cfg.all_lists
-                    || merged_and_last_differ(
-                        &o.flags,
-                        &o.list_flags,
-                        &o.chance_nones,
-                        o.list_lowercased,
-                        &mut o.last,
-                    )
+                    || merged_and_last_differ(&o.flags, &o.list_flags, &o.chance_nones, o.list_lowercased, &mut o.last)
                 {
                     append_masters(
                         o.masters,
@@ -214,12 +201,7 @@ pub(crate) fn make_output_plugin(
         make_lists!(lists, items, helper, LeveledItem, log);
     }
     if !helper.deleted_subrecords.is_empty() {
-        show_deleted_subrecords(
-            &helper.deleted_subrecords,
-            helper.counts.deleted_subrecord,
-            cfg,
-            log,
-        )?;
+        show_deleted_subrecords(&helper.deleted_subrecords, helper.counts.deleted_subrecord, cfg, log)?;
     }
     if !helper.untouched_lists.is_empty() {
         show_untouched_lists(&helper.untouched_lists, cfg, log)?;
@@ -253,63 +235,33 @@ fn delete_subrecords<'a>(
     plugin_info: &'a PluginInfo,
     helper: &mut Helper<'a>,
 ) -> Result<()> {
-    if !helper.cfg.extended_delete
-        && !helper
-            .cfg
-            .always_delete
-            .contains(&plugin_info.name_lowercased)
-    {
+    if !helper.cfg.extended_delete && !helper.cfg.always_delete.contains(&plugin_info.name_lowercased) {
         return Ok(());
     };
     let ratio = 100.0 * delete.len() as f64 / first.len() as f64;
     if helper.cfg.extended_delete
         && ratio > threshold
         && ratio >= helper.cfg.guts.auto_resolve_lower_limit
-        && !helper
-            .cfg
-            .always_delete
-            .contains(&plugin_info.name_lowercased)
+        && !helper.cfg.always_delete.contains(&plugin_info.name_lowercased)
     {
-        helper.threshold_resolved.push(
-            ratio,
-            threshold,
-            log_t,
-            id.to_owned(),
-            &plugin_info.name,
-            &delete,
-        );
+        helper
+            .threshold_resolved
+            .push(ratio, threshold, log_t, id.to_owned(), &plugin_info.name, &delete);
     } else {
         if helper.cfg.extended_delete && ratio > threshold {
-            if helper
-                .cfg
-                .always_delete
-                .contains(&plugin_info.name_lowercased)
-            {
-                helper.threshold_skipped.push(
-                    ratio,
-                    threshold,
-                    log_t,
-                    id.to_owned(),
-                    &plugin_info.name,
-                    &delete,
-                );
+            if helper.cfg.always_delete.contains(&plugin_info.name_lowercased) {
+                helper
+                    .threshold_skipped
+                    .push(ratio, threshold, log_t, id.to_owned(), &plugin_info.name, &delete);
             } else {
-                helper.threshold_warnings.push(
-                    ratio,
-                    threshold,
-                    log_t,
-                    id.to_owned(),
-                    &plugin_info.name,
-                    &delete,
-                );
+                helper
+                    .threshold_warnings
+                    .push(ratio, threshold, log_t, id.to_owned(), &plugin_info.name, &delete);
             }
         }
         let mut subrecords = Vec::new();
         for (subrecord_lowercased, subrecord, responsible_plugins) in delete.into_iter() {
-            let index = match list_lowercased
-                .iter()
-                .position(|x| x == &subrecord_lowercased)
-            {
+            let index = match list_lowercased.iter().position(|x| x == &subrecord_lowercased) {
                 Some(index) => index,
                 None => {
                     return Err(anyhow!("Failed to delete subrecord. This error should've never happened. List id: {}, subrecord id: {}, initial plugin: {}, responsible plugin: {}", id, subrecord.0, &plugin_info.name, responsible_plugins.into_iter().map(|x| x.as_str()).collect::<Vec<_>>().join(", ")));
@@ -318,13 +270,7 @@ fn delete_subrecords<'a>(
 
             list_lowercased.swap_remove(index);
             list.swap_remove(index);
-            subrecords.push((
-                subrecord,
-                responsible_plugins
-                    .into_iter()
-                    .map(|x| x.as_str())
-                    .collect(),
-            ));
+            subrecords.push((subrecord, responsible_plugins.into_iter().map(|x| x.as_str()).collect()));
             helper.counts.deleted_subrecord += 1;
         }
         helper.deleted_subrecords.push(DeletedSubrecords {
@@ -378,21 +324,12 @@ fn make_header(helper: &Helper, masters: Vec<(String, u64)>) -> Header {
 }
 
 fn make_masters(helper: &Helper) -> Vec<(String, u64)> {
-    let mut masters_sorted: Vec<(usize, &String, u64)> =
-        helper.masters_wordy.values().cloned().collect();
+    let mut masters_sorted: Vec<(usize, &String, u64)> = helper.masters_wordy.values().cloned().collect();
     masters_sorted.sort();
-    masters_sorted
-        .into_iter()
-        .map(|(_, b, c)| (b.to_owned(), c))
-        .collect()
+    masters_sorted.into_iter().map(|(_, b, c)| (b.to_owned(), c)).collect()
 }
 
-fn show_deleted_subrecords(
-    list: &[DeletedSubrecords],
-    subrecords_count: usize,
-    cfg: &Cfg,
-    log: &mut Log,
-) -> Result<()> {
+fn show_deleted_subrecords(list: &[DeletedSubrecords], subrecords_count: usize, cfg: &Cfg, log: &mut Log) -> Result<()> {
     let list_len = list.len();
     let mut text = format!(
         "{} subrecord{} from {} leveled list{} {} deleted",
@@ -451,10 +388,7 @@ fn show_untouched_lists(list: &[UntouchedList], cfg: &Cfg, log: &mut Log) -> Res
     };
     msg(&text, MsgTone::Good, 0, cfg, log)?;
     text.clear();
-    text = format!(
-        "\n\t{:<1} {:<32} {:<32} {}\n",
-        "T", "LEVELED LIST", "INITIAL PLUGIN", "LAST PLUGIN"
-    );
+    text = format!("\n\t{:<1} {:<32} {:<32} {}\n", "T", "LEVELED LIST", "INITIAL PLUGIN", "LAST PLUGIN");
     for list_item in list.iter() {
         text.push_str(&format!(
             "\t{:<1} {:<32} {:<32} {}\n",
@@ -504,10 +438,10 @@ fn show_threshold_messages(list: &ThresholdMessages, cfg: &Cfg, log: &mut Log) -
         }
         ThresholdMessageKind::Warning => {
             text = format!(
-            "{} list{} ratio of deleted/initial subrecords higher than threshold, though subrecords were deleted:",
-            list_len,
-            if list_len == 1 { " has" } else { "s have" },
-        );
+                "{} list{} ratio of deleted/initial subrecords higher than threshold, though subrecords were deleted:",
+                list_len,
+                if list_len == 1 { " has" } else { "s have" },
+            );
             msg(&text, MsgTone::Bad, max(0, warnings_off), cfg, log)?;
         }
     }
@@ -548,11 +482,7 @@ Consider performing any of these actions:
 ",
                 if list_len == 1 { " is" } else { "s are" },
                 plugins.join("\", \""),
-                if list_len == 1 {
-                    "this plugin"
-                } else {
-                    "these plugins"
-                },
+                if list_len == 1 { "this plugin" } else { "these plugins" },
                 plugins.join(","),
             ));
         }

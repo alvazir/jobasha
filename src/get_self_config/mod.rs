@@ -8,10 +8,7 @@ mod util;
 use confique::toml::{template, FormatOptions};
 use options::{get_options, Options};
 use settings::{get_settings, Settings};
-use util::{
-    get_color, get_exe_name_and_dir, get_log_file, get_output_file, get_progress_frequency,
-    get_settings_file,
-};
+use util::{get_color, get_exe_name_and_dir, get_log_file, get_output_file, get_progress_frequency, get_settings_file};
 
 pub(crate) struct Cfg {
     pub(crate) config: String,
@@ -85,13 +82,7 @@ pub(crate) struct Guts {
 }
 
 impl Cfg {
-    fn new(
-        opt: Options,
-        set: Settings,
-        settings_file: PathBuf,
-        exe: Option<String>,
-        dir: Option<PathBuf>,
-    ) -> Result<Cfg> {
+    fn new(opt: Options, set: Settings, settings_file: PathBuf, exe: Option<String>, dir: Option<PathBuf>) -> Result<Cfg> {
         macro_rules! opt_or_set_bool {
             ($name:ident) => {
                 match opt.$name {
@@ -122,12 +113,7 @@ impl Cfg {
                     Some(num) => num as f64,
                     None => match set.options.$name_ident <= 100 {
                         true => set.options.$name_ident as f64,
-                        false => {
-                            return Err(anyhow!(format!(
-                                "Value of {} should be in range 0-100",
-                                $name_string
-                            )))
-                        }
+                        false => return Err(anyhow!(format!("Value of {} should be in range 0-100", $name_string))),
                     },
                 }
             };
@@ -165,11 +151,7 @@ impl Cfg {
             always_delete: opt_or_set_vec_lowercase!(always_delete),
             never_delete: opt_or_set_vec_lowercase!(never_delete),
             no_threshold_warnings: opt_or_set_bool!(no_threshold_warnings),
-            verbose: if opt.verbose == 0 {
-                set.options.verbose
-            } else {
-                opt.verbose
-            },
+            verbose: if opt.verbose == 0 { set.options.verbose } else { opt.verbose },
             quiet: opt_or_set_bool!(quiet),
             no_color: opt_or_set_bool!(no_color),
             no_progress: opt_or_set_bool!(no_progress),
@@ -211,21 +193,15 @@ impl Cfg {
 pub(crate) fn get_self_config() -> Result<Cfg> {
     let options = get_options()?;
     let (exe, dir) = get_exe_name_and_dir();
-    let settings_file = get_settings_file(&exe, &dir, &options.settings)
-        .with_context(|| "Failed to get program settings file path")?;
-    let settings = get_settings(&settings_file)
-        .with_context(|| "Failed to get default or provided settings")?;
+    let settings_file =
+        get_settings_file(&exe, &dir, &options.settings).with_context(|| "Failed to get program settings file path")?;
+    let settings = get_settings(&settings_file).with_context(|| "Failed to get default or provided settings")?;
     if options.settings_write {
         let toml = template::<Settings>(FormatOptions::default());
         create_dir_early(&settings_file, "settings")?;
-        fs::write(&settings_file, toml).with_context(|| {
-            format!(
-                "Failed to write default program settings into \"{}\"",
-                settings_file.display()
-            )
-        })?;
+        fs::write(&settings_file, toml)
+            .with_context(|| format!("Failed to write default program settings into \"{}\"", settings_file.display()))?;
     }
-    let configuration = Cfg::new(options, settings, settings_file, exe, dir)
-        .with_context(|| "Failed to configure program")?;
+    let configuration = Cfg::new(options, settings, settings_file, exe, dir).with_context(|| "Failed to configure program")?;
     Ok(configuration)
 }

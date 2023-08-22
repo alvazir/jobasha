@@ -10,3 +10,4 @@
 !/LICENSE-MIT
 !/.gitignore
 !/release.sh
+!/rustfmt.toml

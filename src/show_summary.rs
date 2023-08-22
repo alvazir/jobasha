@@ -2,13 +2,7 @@ use crate::{msg, Cfg, ListCounts, Log, MsgTone, ReadStats};
 use anyhow::Result;
 use std::time::Instant;
 
-pub(crate) fn show_summary(
-    timer: Instant,
-    read_stats: ReadStats,
-    counts: &ListCounts,
-    cfg: &Cfg,
-    log: &mut Log,
-) -> Result<()> {
+pub(crate) fn show_summary(timer: Instant, read_stats: ReadStats, counts: &ListCounts, cfg: &Cfg, log: &mut Log) -> Result<()> {
     let text = format!(
             "Performance: {:.3}s duration, {} plugins read at {:.0}/s, {} records read at {:.0}/s\nLists stats: {} total, {} unique, {} merged, {} placed / {} untouched, {} masters, {} deleted subrecords",
             timer.elapsed().as_secs_f64(),

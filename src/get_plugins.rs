@@ -30,17 +30,10 @@ struct Helper {
 }
 
 pub(crate) fn get_plugins(config_path: &Path, cfg: &Cfg, log: &mut Log) -> Result<Vec<PluginInfo>> {
-    let text = format!(
-        "Gathering plugins from game configuration file \"{}\"",
-        config_path.display()
-    );
+    let text = format!("Gathering plugins from game configuration file \"{}\"", config_path.display());
     msg(text, MsgTone::Neutral, 1, cfg, log)?;
-    let config_lines = read_lines(config_path).with_context(|| {
-        format!(
-            "Failed to read game configuration file \"{}\"",
-            config_path.display()
-        )
-    })?;
+    let config_lines =
+        read_lines(config_path).with_context(|| format!("Failed to read game configuration file \"{}\"", config_path.display()))?;
     let mut res: Vec<PluginInfo> = Vec::new();
     let mut helper: Helper = Helper::default();
     let mut omw_data_dirs: Vec<(usize, PathBuf)> = Vec::new();
@@ -51,8 +44,7 @@ pub(crate) fn get_plugins(config_path: &Path, cfg: &Cfg, log: &mut Log) -> Resul
                 mor_get_data_files_dir(config_path, &mut helper, cfg)
                     .with_context(|| "Failed to find Morrowind's \"Data Files\" directory")?;
             }
-            mor_get_plugin(&line, &mut res, &mut helper, cfg, log)
-                .with_context(|| "Failed to find Morrowind's plugin")?;
+            mor_get_plugin(&line, &mut res, &mut helper, cfg, log).with_context(|| "Failed to find Morrowind's plugin")?;
         }
         if !helper.mor_found {
             if !helper.omw_data_ended && line.starts_with(&cfg.guts.omw_line_beginning_data) {
@@ -61,8 +53,8 @@ pub(crate) fn get_plugins(config_path: &Path, cfg: &Cfg, log: &mut Log) -> Resul
             }
             if line.starts_with(&cfg.guts.omw_line_beginning_content) {
                 if !helper.omw_all_plugins_found {
-                    omw_all_plugins = get_all_plugins(&omw_data_dirs, &mut helper, cfg)
-                        .with_context(|| "Failed to find all OpenMW's plugins")?;
+                    omw_all_plugins =
+                        get_all_plugins(&omw_data_dirs, &mut helper, cfg).with_context(|| "Failed to find all OpenMW's plugins")?;
                 };
                 omw_get_plugin(&line, &mut res, &omw_all_plugins, &mut helper, cfg, log)
                     .with_context(|| "Failed to find OpenMW's plugin")?;
@@ -70,8 +62,7 @@ pub(crate) fn get_plugins(config_path: &Path, cfg: &Cfg, log: &mut Log) -> Resul
         }
     }
     if cfg.skip_last > 0 {
-        skip_last_plugins(&mut res, &helper, cfg, log)
-            .with_context(|| format!("Failed to skip last {} plugins", cfg.skip_last))?;
+        skip_last_plugins(&mut res, &helper, cfg, log).with_context(|| format!("Failed to skip last {} plugins", cfg.skip_last))?;
     }
     Ok(res)
 }
@@ -80,53 +71,34 @@ fn read_lines<P>(filename: P) -> Result<io::Lines<io::BufReader<File>>>
 where
     P: AsRef<Path>,
 {
-    let file = File::open(&filename)
-        .with_context(|| format!("Failed to open file \"{}\"", filename.as_ref().display()))?;
+    let file = File::open(&filename).with_context(|| format!("Failed to open file \"{}\"", filename.as_ref().display()))?;
     Ok(io::BufReader::new(file).lines())
 }
 
-fn get_all_plugins(
-    omw_data_dirs: &[(usize, PathBuf)],
-    helper: &mut Helper,
-    cfg: &Cfg,
-) -> Result<HashMap<String, PathBuf>> {
+fn get_all_plugins(omw_data_dirs: &[(usize, PathBuf)], helper: &mut Helper, cfg: &Cfg) -> Result<HashMap<String, PathBuf>> {
     let mut found_plugins: Vec<(usize, String, PathBuf)> = omw_data_dirs
         .par_iter()
-        .map(
-            |(id, dir_path)| -> Result<Vec<(usize, String, PathBuf)>, _> {
-                let mut res: Vec<(usize, String, PathBuf)> = Vec::new();
-                match fs::read_dir(dir_path) {
-                    Ok(dir_contents) => {
-                        for entry in dir_contents.flatten() {
-                            let path = entry.path();
-                            if let Some(plugin_extension) = path.extension() {
-                                if cfg
-                                    .guts
-                                    .omw_plugin_extensions
-                                    .contains(&plugin_extension.to_ascii_lowercase())
-                                {
-                                    res.push((
-                                        *id,
-                                        entry.file_name().to_string_lossy().into_owned(),
-                                        path,
-                                    ));
-                                }
+        .map(|(id, dir_path)| -> Result<Vec<(usize, String, PathBuf)>, _> {
+            let mut res: Vec<(usize, String, PathBuf)> = Vec::new();
+            match fs::read_dir(dir_path) {
+                Ok(dir_contents) => {
+                    for entry in dir_contents.flatten() {
+                        let path = entry.path();
+                        if let Some(plugin_extension) = path.extension() {
+                            if cfg.guts.omw_plugin_extensions.contains(&plugin_extension.to_ascii_lowercase()) {
+                                res.push((*id, entry.file_name().to_string_lossy().into_owned(), path));
                             }
                         }
                     }
-                    Err(error) => {
-                        let text = format!(
-                            "Failed to open directory \"{}\" with error \"{}\"",
-                            dir_path.display(),
-                            error
-                        );
-                        err_or_ignore_thread_safe(text, cfg)?;
-                    }
                 }
+                Err(error) => {
+                    let text = format!("Failed to open directory \"{}\" with error \"{}\"", dir_path.display(), error);
+                    err_or_ignore_thread_safe(text, cfg)?;
+                }
+            }
 
-                Ok(res)
-            },
-        )
+            Ok(res)
+        })
         .collect::<Result<Vec<_>>>()?
         .into_iter()
         .filter(|vec| !vec.is_empty())
@@ -134,14 +106,11 @@ fn get_all_plugins(
         .collect();
     found_plugins.sort();
     let mut all_plugins: HashMap<String, PathBuf> = HashMap::new();
-    found_plugins
-        .into_iter()
-        .rev()
-        .for_each(|(_, plugin, path)| {
-            if let Entry::Vacant(v) = all_plugins.entry(plugin) {
-                v.insert(path);
-            }
-        });
+    found_plugins.into_iter().rev().for_each(|(_, plugin, path)| {
+        if let Entry::Vacant(v) = all_plugins.entry(plugin) {
+            v.insert(path);
+        }
+    });
     if !helper.omw_all_plugins_found {
         helper.omw_all_plugins_found = true;
     }
@@ -164,13 +133,7 @@ fn mor_get_data_files_dir(config_path: &Path, helper: &mut Helper, cfg: &Cfg) ->
     Ok(())
 }
 
-fn mor_get_plugin(
-    line: &str,
-    res: &mut Vec<PluginInfo>,
-    helper: &mut Helper,
-    cfg: &Cfg,
-    log: &mut Log,
-) -> Result<()> {
+fn mor_get_plugin(line: &str, res: &mut Vec<PluginInfo>, helper: &mut Helper, cfg: &Cfg, log: &mut Log) -> Result<()> {
     if let Some(raw_name) = line.split('=').nth(1) {
         if let Some((name, name_lowercased)) = skip_filtered_plugins(raw_name, helper, cfg, log)? {
             let path = helper.mor_data_files_dir.join(&name);
@@ -248,12 +211,7 @@ fn omw_get_plugin(
     Ok(())
 }
 
-fn skip_filtered_plugins(
-    raw_name: &str,
-    helper: &mut Helper,
-    cfg: &Cfg,
-    log: &mut Log,
-) -> Result<Option<(String, String)>> {
+fn skip_filtered_plugins(raw_name: &str, helper: &mut Helper, cfg: &Cfg, log: &mut Log) -> Result<Option<(String, String)>> {
     let name = raw_name.trim().to_owned();
     let name_lowercased = name.to_lowercase();
     helper.preskipped_plugins_number += 1;
@@ -263,32 +221,25 @@ fn skip_filtered_plugins(
             name
         )
     } else if name_lowercased.starts_with(&cfg.output.name_lowercased_starts_with) {
-        format!("Plugin \"{}\" will be skipped, because it's name matches output plugin name pattern \"{}\"", name, cfg.output.name_lowercased_starts_with)
-    } else if cfg.skip.contains(&name_lowercased) {
         format!(
-            "Plugin \"{}\" will be skipped, because it's listed as a plugin to skip",
-            name
+            "Plugin \"{}\" will be skipped, because it's name matches output plugin name pattern \"{}\"",
+            name, cfg.output.name_lowercased_starts_with
         )
+    } else if cfg.skip.contains(&name_lowercased) {
+        format!("Plugin \"{}\" will be skipped, because it's listed as a plugin to skip", name)
     } else {
         String::new()
     };
     if text.is_empty() {
         Ok(Some((name, name_lowercased)))
     } else {
-        helper
-            .skipped_plugin_numbers
-            .push(helper.preskipped_plugins_number);
+        helper.skipped_plugin_numbers.push(helper.preskipped_plugins_number);
         msg(&text, MsgTone::Neutral, 0, cfg, log)?;
         Ok(None)
     }
 }
 
-fn skip_last_plugins(
-    res: &mut Vec<PluginInfo>,
-    helper: &Helper,
-    cfg: &Cfg,
-    log: &mut Log,
-) -> Result<()> {
+fn skip_last_plugins(res: &mut Vec<PluginInfo>, helper: &Helper, cfg: &Cfg, log: &mut Log) -> Result<()> {
     let res_len = res.len();
     if res_len > cfg.skip_last {
         // Make plugins defined in both plugins_skip and plugins_skip_last be skipped once
@@ -302,11 +253,7 @@ fn skip_last_plugins(
             }
         }
         let mut number_shift = 0;
-        for (number, plugin) in res
-            .drain(res_len + skip_last_modifier - cfg.skip_last..)
-            .rev()
-            .enumerate()
-        {
+        for (number, plugin) in res.drain(res_len + skip_last_modifier - cfg.skip_last..).rev().enumerate() {
             // Make plugins defined in both plugins_skip and plugins_skip_last be skipped once
             let mut check_number = number + number_shift;
             loop {

@@ -131,11 +131,7 @@ macro_rules! get_lists {
                         add_master = true;
                     }
                     if o.count == 1 {
-                        o.list_lowercased = o
-                            .list
-                            .iter()
-                            .map(|(name, level)| (name.to_lowercase(), *level))
-                            .collect();
+                        o.list_lowercased = o.list.iter().map(|(name, level)| (name.to_lowercase(), *level)).collect();
                         o.first = o
                             .list_lowercased
                             .iter()
@@ -149,25 +145,15 @@ macro_rules! get_lists {
                         .map(|(name, level)| (name.to_lowercase(), *level))
                         .collect::<Vec<_>>();
                     if !$helper.cfg.no_delete
-                        && !($helper.cfg.extended_delete
-                            && $helper.cfg.never_delete.contains(&o.plugin_name_lowercased))
+                        && !($helper.cfg.extended_delete && $helper.cfg.never_delete.contains(&o.plugin_name_lowercased))
                     {
                         for (list_item_lowercased, list_item) in o.first.iter() {
-                            let object_count = object_list_lowercased
-                                .iter()
-                                .filter(|x| x == &list_item_lowercased)
-                                .count();
-                            let first_count = o
-                                .first
-                                .iter()
-                                .filter(|(x, _)| x == list_item_lowercased)
-                                .count();
+                            let object_count = object_list_lowercased.iter().filter(|x| x == &list_item_lowercased).count();
+                            let first_count = o.first.iter().filter(|(x, _)| x == list_item_lowercased).count();
                             if object_count < first_count {
                                 if o.delete
                                     .iter()
-                                    .filter(|(subrecord_lowercased, _, _)| {
-                                        subrecord_lowercased == list_item_lowercased
-                                    })
+                                    .filter(|(subrecord_lowercased, _, _)| subrecord_lowercased == list_item_lowercased)
                                     .count()
                                     < (first_count - object_count)
                                 {
@@ -178,13 +164,12 @@ macro_rules! get_lists {
                                     ));
                                     add_master = true;
                                 } else {
-                                    for (_, _, responsible_plugins) in o.delete.iter_mut().filter(
-                                        |(subrecord_lowercased, _, _)| {
-                                            subrecord_lowercased == list_item_lowercased
-                                        },
-                                    ) {
-                                        if !responsible_plugins.contains(&&$helper.plugin_info.name)
-                                        {
+                                    for (_, _, responsible_plugins) in o
+                                        .delete
+                                        .iter_mut()
+                                        .filter(|(subrecord_lowercased, _, _)| subrecord_lowercased == list_item_lowercased)
+                                    {
+                                        if !responsible_plugins.contains(&&$helper.plugin_info.name) {
                                             responsible_plugins.push(&$helper.plugin_info.name)
                                         }
                                     }
@@ -194,25 +179,14 @@ macro_rules! get_lists {
                     }
                     for (index, list_item_lowercased) in object_list_lowercased.iter().enumerate() {
                         if !o.list_lowercased.contains(list_item_lowercased)
-                            || object_list_lowercased
-                                .iter()
-                                .filter(|x| x == &list_item_lowercased)
-                                .count()
-                                > o.list_lowercased
-                                    .iter()
-                                    .filter(|x| x == &list_item_lowercased)
-                                    .count()
+                            || object_list_lowercased.iter().filter(|x| x == &list_item_lowercased).count()
+                                > o.list_lowercased.iter().filter(|x| x == &list_item_lowercased).count()
                         {
                             o.list_lowercased.push(list_item_lowercased.clone());
                             o.list.push(object.$name[index].clone());
                             add_master = true;
                         } else {
-                            if o.first
-                                .iter()
-                                .filter(|(x, _)| x == list_item_lowercased)
-                                .count()
-                                == 0
-                            {
+                            if o.first.iter().filter(|(x, _)| x == list_item_lowercased).count() == 0 {
                                 add_master = true;
                             }
                         }
@@ -232,10 +206,7 @@ macro_rules! get_lists {
     };
 }
 
-pub(crate) fn get_lists<'a>(
-    plugins: &'a [PluginInfo],
-    cfg: &'a Cfg,
-) -> Result<(Vec<Creature<'a>>, Vec<Item<'a>>, ReadStats)> {
+pub(crate) fn get_lists<'a>(plugins: &'a [PluginInfo], cfg: &'a Cfg) -> Result<(Vec<Creature<'a>>, Vec<Item<'a>>, ReadStats)> {
     let mut creatures: Vec<Creature> = Vec::new();
     let mut items: Vec<Item> = Vec::new();
     let mut helper = Helper::new(cfg, &plugins[0]);

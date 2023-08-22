@@ -16,10 +16,7 @@ fn find_config(cfg: &Cfg, log: &mut Log) -> Result<PathBuf> {
     macro_rules! check_config_path {
         ($config_path:expr) => {
             if $config_path.exists() {
-                let text = format!(
-                    "Found game configuration file \"{}\"",
-                    $config_path.display()
-                );
+                let text = format!("Found game configuration file \"{}\"", $config_path.display());
                 msg(text, MsgTone::Good, 0, cfg, log)?;
                 return Ok($config_path);
             } else {

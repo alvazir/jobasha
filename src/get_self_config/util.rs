@@ -10,30 +10,20 @@ use std::{
 pub(crate) fn get_exe_name_and_dir() -> (Option<String>, Option<PathBuf>) {
     match current_exe() {
         Ok(path) => (
-            path.file_stem()
-                .map(|exe| exe.to_string_lossy().into_owned()),
+            path.file_stem().map(|exe| exe.to_string_lossy().into_owned()),
             path.parent().map(|dir| dir.to_owned()),
         ),
         Err(_) => (None, None),
     }
 }
 
-pub(crate) fn get_settings_file(
-    exe: &Option<String>,
-    dir: &Option<PathBuf>,
-    name: &Option<String>,
-) -> Result<PathBuf> {
+pub(crate) fn get_settings_file(exe: &Option<String>, dir: &Option<PathBuf>, name: &Option<String>) -> Result<PathBuf> {
     let extension = "toml";
     let fallback_filename = "settings.toml";
     let filename = match name {
         Some(name) => match Path::new(name).file_stem() {
             Some(filename) => format!("{}.{extension}", filename.to_string_lossy()),
-            None => {
-                return Err(anyhow!(
-                    "Failed to get settings filename without extension from \"{}\"",
-                    name
-                ))
-            }
+            None => return Err(anyhow!("Failed to get settings filename without extension from \"{}\"", name)),
         },
         None => match exe {
             Some(file_stem) => format!("{file_stem}.{extension}"),
@@ -59,12 +49,7 @@ pub(crate) fn get_settings_file(
     Ok(settings_file)
 }
 
-pub(crate) fn get_log_file(
-    no_log: bool,
-    name: String,
-    exe: Option<String>,
-    dir: Option<PathBuf>,
-) -> Result<Option<PathBuf>> {
+pub(crate) fn get_log_file(no_log: bool, name: String, exe: Option<String>, dir: Option<PathBuf>) -> Result<Option<PathBuf>> {
     if no_log {
         return Ok(None);
     }
@@ -123,11 +108,7 @@ pub(crate) fn get_progress_frequency(frequency: u8) -> Result<u8> {
 pub(crate) fn get_output_file(opt: &Options, set: &Settings) -> Result<OutputFile> {
     macro_rules! name_parse_error {
         ($name:ident, $part:expr) => {
-            return Err(anyhow!(
-                "Failed to parse {} from output plugin name: \"{}\"",
-                $part,
-                $name,
-            ))
+            return Err(anyhow!("Failed to parse {} from output plugin name: \"{}\"", $part, $name,))
         };
     }
     let raw_path = match &opt.output {
@@ -164,11 +145,7 @@ pub(crate) fn get_output_file(opt: &Options, set: &Settings) -> Result<OutputFil
     let name: String;
     if !no_date {
         let separator_default = &set.guts.output_date_separators[0];
-        let date_infix = format!(
-            "{}{}",
-            separator_default,
-            Local::now().format(&set.guts.output_date_format)
-        );
+        let date_infix = format!("{}{}", separator_default, Local::now().format(&set.guts.output_date_format));
         name_lowercased_starts_with = format!("{}{}", stem, separator_default).to_lowercase();
         name = format!("{}{}.{}", stem, date_infix, extension);
         path = dir_path.join(&name);

@@ -58,20 +58,10 @@ pub(crate) struct Options {
     )]
     pub(crate) output_dir: Option<String>,
     /// Do not add date to the output plugin name.
-    #[arg(
-        conflicts_with = "settings_write",
-        short,
-        long,
-        help = "Do not add date to the output plugin name"
-    )]
+    #[arg(conflicts_with = "settings_write", short, long, help = "Do not add date to the output plugin name")]
     pub(crate) no_date: bool,
     /// Do not write output plugin.
-    #[arg(
-        conflicts_with = "settings_write",
-        short,
-        long,
-        help = "Do not write output plugin"
-    )]
+    #[arg(conflicts_with = "settings_write", short, long, help = "Do not write output plugin")]
     pub(crate) dry_run: bool,
     /// Name of the log file. May be provided as a path. Non-existent directories will be created.
     ///
@@ -110,11 +100,7 @@ pub(crate) struct Options {
     #[arg(long, help = "Write default program settings file and exit")]
     pub(crate) settings_write: bool,
     /// Ignore non-critical errors, e.g. missing plugin. May be useful, though it's better to fix underlying problems.
-    #[arg(
-        conflicts_with = "settings_write",
-        long,
-        help = "Ignore non-critical errors"
-    )]
+    #[arg(conflicts_with = "settings_write", long, help = "Ignore non-critical errors")]
     pub(crate) ignore_errors: bool,
     /// Place all leveled lists into the output plugin.
     ///
@@ -310,12 +296,7 @@ pub(crate) struct Options {
     )]
     pub(crate) quiet: bool,
     /// Do not show colored output.
-    #[arg(
-        help_heading = "Display output",
-        short = 'C',
-        long,
-        help = "Do not show colored output"
-    )]
+    #[arg(help_heading = "Display output", short = 'C', long, help = "Do not show colored output")]
     pub(crate) no_color: bool,
     /// Do not show plugins reading progress.
     ///

@@ -45,16 +45,9 @@ macro_rules! msg {
     };
 }
 
-pub(crate) fn msg<S: AsRef<str>>(
-    text: S,
-    tone: MsgTone,
-    verbose: u8,
-    cfg: &Cfg,
-    log: &mut Log,
-) -> Result<()> {
+pub(crate) fn msg<S: AsRef<str>>(text: S, tone: MsgTone, verbose: u8, cfg: &Cfg, log: &mut Log) -> Result<()> {
     if !cfg.no_log {
-        log.write(&text)
-            .with_context(|| "Failed to write to log file buffer")?;
+        log.write(&text).with_context(|| "Failed to write to log file buffer")?;
     }
     msg!(text, tone, verbose, cfg);
     Ok(())
@@ -167,9 +160,9 @@ impl Log {
                 Some(log) => log,
             };
             create_dir_early(log, "log")?;
-            let buffer = Some(BufWriter::new(File::create(log).with_context(|| {
-                format!("Failed to create/open log file \"{}\"", log.display())
-            })?));
+            let buffer = Some(BufWriter::new(
+                File::create(log).with_context(|| format!("Failed to create/open log file \"{}\"", log.display()))?,
+            ));
             Ok(Log { buffer })
         } else {
             Ok(Log { buffer: None })
@@ -186,16 +179,9 @@ impl Log {
     }
 }
 
-pub(crate) fn show_output_plugin_suggestion(
-    counts: &ListCounts,
-    cfg: &Cfg,
-    log: &mut Log,
-) -> Result<()> {
+pub(crate) fn show_output_plugin_suggestion(counts: &ListCounts, cfg: &Cfg, log: &mut Log) -> Result<()> {
     if !cfg.dry_run && counts.placed != 0 {
-        let text = format!(
-            "\nPlace \"{}\" last in load order and activate\n",
-            cfg.output.name
-        );
+        let text = format!("\nPlace \"{}\" last in load order and activate\n", cfg.output.name);
         msg(text, MsgTone::Warm, 0, cfg, log)?;
     }
     Ok(())
@@ -221,10 +207,7 @@ pub(crate) fn show_log_path(cfg: &Cfg, log: &mut Log) -> Result<()> {
 
 pub(crate) fn show_settings_written(cfg: &Cfg, log: &mut Log) -> Result<()> {
     msg(
-        format!(
-            "Wrote default program settings into \"{}\"",
-            cfg.settings.display()
-        ),
+        format!("Wrote default program settings into \"{}\"", cfg.settings.display()),
         MsgTone::Good,
         0,
         cfg,
@@ -237,9 +220,7 @@ pub(crate) fn create_dir_early(path: &Path, name: &str) -> Result<()> {
         None => {}
         Some(dir) => {
             if dir != Path::new("") && !dir.exists() {
-                create_dir_all(dir).with_context(|| {
-                    format!("Failed to create {} directory \"{}\"", dir.display(), name)
-                })?;
+                create_dir_all(dir).with_context(|| format!("Failed to create {} directory \"{}\"", dir.display(), name))?;
                 eprintln!(
                     "{} directory \"{}\" was created",
                     name[0..1].to_uppercase() + &name[1..],
