@@ -3,7 +3,7 @@ name = "jobasha"
 version = "0.1.0"
 authors = ["alvazir <basha.alvazir@gmail.com>"]
 edition = "2021"
-rust-version = "1.69.0"
+rust-version = "1.71.1"
 description = "Jobasha - Yet Another TES3 Leveled List Tool"
 readme = "README.md"
 homepage = "https://www.nexusmods.com/morrowind/mods/52707"
@@ -17,23 +17,23 @@ publish = false
 maintenance = { status = "actively-developed" }
 
 [dependencies.tes3]
+# path = "../tes3"
 git = "https://github.com/Greatness7/tes3"
+rev = "6b6a0ff"
 # branch = "dev"
-rev = "f682feb6"
 default-features = false
 features = ["esp"]
-# version = "0"
 
 [dependencies]
-clap = { version = "~4.2.4", features = ["derive", "suggestions", "wrap_help"] } # CLI
-confique = { version = "~0.2.3", default-features = false, features = ["toml"] } # settings file
-serde = "~1.0.160"    # required by confique
-anyhow = "~1.0.70"    # error management
-rayon = "~1.7.0"      # quickly find OpenMW plugins
-dirs = "~5.0.0"       # find openmw.cfg
-console = "~0.15.5"   # colored output
-indicatif = "~0.17.3" # progress bar
-chrono = "~0.4.24"    # get date to put into result's name
+clap = { version = "~4.3.23", features = ["derive", "suggestions", "wrap_help"] } # CLI
+confique = { version = "~0.2.4", default-features = false, features = ["toml"] }  # settings file
+serde = "~1.0.185"                                                                # required by confique
+anyhow = "~1.0.75"                                                                # error management
+rayon = "~1.7.0"                                                                  # quickly find OpenMW plugins
+dirs = "~5.0.1"                                                                   # find openmw.cfg
+console = "~0.15.7"                                                               # colored output
+indicatif = "~0.17.6"                                                             # progress bar
+chrono = "~0.4.26"                                                                # get date to put into result's name
 
 [profile.release-lto]
 inherits = "release"

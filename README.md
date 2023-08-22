@@ -7,7 +7,7 @@ Yet another TES3 leveled list tool.
 
 ## Description
 
-Jobasha is a [command line](https://en.wikipedia.org/wiki/Command-line_interface) tool for [leveled lists](https://en.uesp.net/wiki/Morrowind:Leveled_Lists) manipulation.  
+Jobasha will perfectly organize all your lists in his library. It is a [command line](https://en.wikipedia.org/wiki/Command-line_interface) tool for [leveled lists](https://en.uesp.net/wiki/Morrowind:Leveled_Lists) manipulation.  
 
 Features:  
 [x] [Merge leveled lists](https://en.uesp.net/wiki/Morrowind_Mod:Leveled_Lists#List_Merging)  
@@ -321,7 +321,7 @@ Place "MergedLeveledLists - 2023-04-20.esp" last in load order and activate
 
 <details>
 
-<summary>Jobasha is written in Rust, so you'll need to grab a [Rust installation](https://www.rust-lang.org) in order to compile it. Jobasha compiles with Rust 1.69.0(stable) or newer</summary>
+<summary>Jobasha is written in Rust, so you'll need to grab a [Rust installation](https://www.rust-lang.org) in order to compile it. Jobasha compiles with Rust 1.71.1(stable) or newer</summary>
 
 ```shell
 git clone https://github.com/alvazir/jobasha
