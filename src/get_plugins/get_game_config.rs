@@ -3,7 +3,7 @@ use anyhow::{anyhow, Context, Result};
 use dirs::{document_dir, preference_dir};
 use std::path::PathBuf;
 
-pub(crate) fn get_game_config(cfg: &Cfg, log: &mut Log) -> Result<PathBuf> {
+pub(super) fn get_game_config(cfg: &Cfg, log: &mut Log) -> Result<PathBuf> {
     match cfg.config.is_empty() {
         true => find_config(cfg, log).with_context(|| "Failed to find game configuration file"),
         false => check_config(cfg).with_context(|| "Failed to read game configuration file"),

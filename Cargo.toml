@@ -1,14 +1,14 @@
 [package]
 name = "jobasha"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["alvazir <basha.alvazir@gmail.com>"]
 edition = "2021"
-rust-version = "1.71.1"
-description = "Jobasha - Yet Another TES3 Leveled List Tool"
+rust-version = "1.74.0"
+description = "Jobasha - TES3 leveled list merging and deleveling tool"
 readme = "README.md"
 homepage = "https://www.nexusmods.com/morrowind/mods/52707"
 repository = "https://github.com/alvazir/jobasha"
-license = "Unlicense OR MIT"
+license = "GPL-3.0-or-later"
 keywords = ["cli", "tes3", "morrowind", "openmw"]
 categories = ["command-line-utilities", "game development"]
 publish = false
@@ -19,21 +19,22 @@ maintenance = { status = "actively-developed" }
 [dependencies.tes3]
 # path = "../tes3"
 git = "https://github.com/Greatness7/tes3"
-rev = "6b6a0ff"
+rev = "2fae07a0"
 # branch = "dev"
 default-features = false
 features = ["esp"]
 
 [dependencies]
-clap = { version = "~4.3.23", features = ["derive", "suggestions", "wrap_help"] } # CLI
-confique = { version = "~0.2.4", default-features = false, features = ["toml"] }  # settings file
-serde = "~1.0.185"                                                                # required by confique
-anyhow = "~1.0.75"                                                                # error management
-rayon = "~1.7.0"                                                                  # quickly find OpenMW plugins
-dirs = "~5.0.1"                                                                   # find openmw.cfg
-console = "~0.15.7"                                                               # colored output
-indicatif = "~0.17.6"                                                             # progress bar
-chrono = "~0.4.26"                                                                # get date to put into result's name
+clap = { version = "~4.4.8", features = ["derive", "suggestions", "wrap_help"] } # CLI
+confique = { version = "~0.2.4", default-features = false, features = ["toml"] } # settings file
+serde = "~1.0.192"                                                               # required by confique
+anyhow = "~1.0.75"                                                               # error management
+dirs = "~5.0.1"                                                                  # find openmw.cfg
+rayon = "~1.8.0"                                                                 # find files in parallel
+fs-err = "~2.10.0"                                                               # better fs errors
+console = "~0.15.7"                                                              # colored output
+indicatif = "~0.17.7"                                                            # progress bar
+chrono = "~0.4.31"                                                               # get date to put into result's name
 
 [profile.release-lto]
 inherits = "release"

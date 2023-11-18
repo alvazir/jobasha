@@ -1,13 +1,13 @@
 use crate::{Cfg, PluginInfo, Progress};
 use anyhow::{Context, Result};
 use std::collections::{hash_map::Entry, HashMap};
-use tes3::esp::{LeveledCreature, LeveledItem, ObjectFlags, Plugin, TES3Object};
+use tes3::esp::{LeveledCreature, LeveledCreatureFlags, LeveledItem, LeveledItemFlags, ObjectFlags, Plugin, TES3Object};
 
 #[derive(Clone, PartialEq)]
 pub(crate) struct Creature<'a> {
     pub(crate) flags: Vec<ObjectFlags>,
     pub(crate) id: String,
-    pub(crate) list_flags: Vec<u32>,
+    pub(crate) leveled_creature_flags: Vec<LeveledCreatureFlags>,
     pub(crate) chance_nones: Vec<u8>,
     pub(crate) list: Vec<Subrecord>,
     pub(crate) list_lowercased: Vec<Subrecord>,
@@ -16,7 +16,24 @@ pub(crate) struct Creature<'a> {
     pub(crate) count: usize,
     pub(crate) plugin_name_lowercased: PluginName<'a>,
     pub(crate) masters: Vec<&'a PluginInfo>,
-    pub(crate) last: LastList,
+    pub(crate) last: LastCreature,
+    pub(crate) last_plugin_name: Option<PluginName<'a>>,
+}
+
+#[derive(Clone, PartialEq)]
+pub(crate) struct Item<'a> {
+    pub(crate) flags: Vec<ObjectFlags>,
+    pub(crate) id: String,
+    pub(crate) leveled_item_flags: Vec<LeveledItemFlags>,
+    pub(crate) chance_nones: Vec<u8>,
+    pub(crate) list: Vec<Subrecord>,
+    pub(crate) list_lowercased: Vec<Subrecord>,
+    pub(crate) first: Vec<(Subrecord, Subrecord)>,
+    pub(crate) delete: Vec<(Subrecord, Subrecord, ResponsiblePlugins<'a>)>,
+    pub(crate) count: usize,
+    pub(crate) plugin_name_lowercased: PluginName<'a>,
+    pub(crate) masters: Vec<&'a PluginInfo>,
+    pub(crate) last: LastItem,
     pub(crate) last_plugin_name: Option<PluginName<'a>>,
 }
 
@@ -24,15 +41,43 @@ pub(crate) type Subrecord = (String, u16);
 pub(crate) type PluginName<'a> = &'a String;
 pub(crate) type ResponsiblePlugins<'a> = Vec<PluginName<'a>>;
 
-#[derive(Default, Clone, PartialEq)]
-pub(crate) struct LastList {
+#[derive(Clone, PartialEq)]
+pub(crate) struct LastCreature {
     pub(crate) flag: ObjectFlags,
-    pub(crate) list_flag: u32,
+    pub(crate) list_flag: LeveledCreatureFlags,
     pub(crate) chance_none: u8,
     pub(crate) list: Vec<Subrecord>,
 }
 
-pub(crate) type Item<'a> = Creature<'a>;
+impl Default for LastCreature {
+    fn default() -> Self {
+        LastCreature {
+            flag: ObjectFlags::default(),
+            list_flag: LeveledCreatureFlags::CALCULATE_FROM_ALL_LEVELS,
+            chance_none: u8::default(),
+            list: Vec::new(),
+        }
+    }
+}
+
+#[derive(Clone, PartialEq)]
+pub(crate) struct LastItem {
+    pub(crate) flag: ObjectFlags,
+    pub(crate) list_flag: LeveledItemFlags,
+    pub(crate) chance_none: u8,
+    pub(crate) list: Vec<Subrecord>,
+}
+
+impl Default for LastItem {
+    fn default() -> Self {
+        LastItem {
+            flag: ObjectFlags::default(),
+            list_flag: LeveledItemFlags::CALCULATE_FROM_ALL_LEVELS,
+            chance_none: u8::default(),
+            list: Vec::new(),
+        }
+    }
+}
 
 struct Helper<'a> {
     cfg: &'a Cfg,
@@ -93,14 +138,14 @@ impl ReadStats {
 }
 
 macro_rules! get_lists {
-    ($name:ident, $helper:ident, $my_kind:ident, $tes3_kind:ident) => {
+    ($name:ident, $helper:ident, $my_kind:ident, $tes3_kind:ident, $flags_kind:ident, $last:ident) => {
         for object in $helper.plugin_content.objects_of_type::<$tes3_kind>() {
             match $helper.$name.ids.entry(object.id.to_lowercase()) {
                 Entry::Vacant(v) => {
                     $name.push($my_kind {
                         flags: vec![object.flags.clone()],
                         id: object.id.clone(),
-                        list_flags: vec![object.list_flags],
+                        $flags_kind: vec![object.$flags_kind],
                         chance_nones: vec![object.chance_none],
                         list: object.$name.clone(),
                         list_lowercased: Vec::new(),
@@ -109,7 +154,7 @@ macro_rules! get_lists {
                         count: 1,
                         plugin_name_lowercased: &$helper.plugin_info.name_lowercased,
                         masters: vec![&$helper.plugin_info],
-                        last: LastList::default(),
+                        last: $last::default(),
                         last_plugin_name: None,
                     });
                     v.insert($helper.$name.counter);
@@ -122,8 +167,8 @@ macro_rules! get_lists {
                         o.flags.push(object.flags.clone());
                         add_master = true;
                     }
-                    if !o.list_flags.contains(&object.list_flags) {
-                        o.list_flags.push(object.list_flags);
+                    if !o.$flags_kind.contains(&object.$flags_kind) {
+                        o.$flags_kind.push(object.$flags_kind);
                         add_master = true;
                     }
                     if !o.chance_nones.contains(&object.chance_none) {
@@ -196,7 +241,7 @@ macro_rules! get_lists {
                     }
                     o.last.list = object.$name.clone();
                     o.last.flag = object.flags.clone();
-                    o.last.list_flag = object.list_flags;
+                    o.last.list_flag = object.$flags_kind;
                     o.last.chance_none = object.chance_none;
                     o.last_plugin_name = Some(&$helper.plugin_info.name);
                     o.count += 1;
@@ -206,7 +251,7 @@ macro_rules! get_lists {
     };
 }
 
-pub(crate) fn get_lists<'a>(plugins: &'a [PluginInfo], cfg: &'a Cfg) -> Result<(Vec<Creature<'a>>, Vec<Item<'a>>, ReadStats)> {
+pub(super) fn get_lists<'a>(plugins: &'a [PluginInfo], cfg: &'a Cfg) -> Result<(Vec<Creature<'a>>, Vec<Item<'a>>, ReadStats)> {
     let mut creatures: Vec<Creature> = Vec::new();
     let mut items: Vec<Item> = Vec::new();
     let mut helper = Helper::new(cfg, &plugins[0]);
@@ -224,10 +269,10 @@ pub(crate) fn get_lists<'a>(plugins: &'a [PluginInfo], cfg: &'a Cfg) -> Result<(
             .with_context(|| format!("Failed to read plugin \"{}\"", &plugin_info.name))?;
         stats.get_records(&helper.plugin_content.objects[0]);
         if !cfg.creatures.no {
-            get_lists!(creatures, helper, Creature, LeveledCreature);
+            get_lists!(creatures, helper, Creature, LeveledCreature, leveled_creature_flags, LastCreature);
         }
         if !cfg.items.no {
-            get_lists!(items, helper, Item, LeveledItem);
+            get_lists!(items, helper, Item, LeveledItem, leveled_item_flags, LastItem);
         }
     }
     stats.get_plugins(plugins_len);

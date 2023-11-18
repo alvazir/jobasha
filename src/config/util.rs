@@ -1,13 +1,15 @@
-use super::{Options, OutputFile, Settings};
-use anyhow::{anyhow, Result};
+use super::{Options, OutputFile, PluginKind, Settings, SettingsFile};
+use crate::read_lines;
+use anyhow::{anyhow, Context, Result};
 use chrono::Local;
 use console::Style;
+use fs_err::copy;
 use std::{
     env::current_exe,
     path::{Path, PathBuf},
 };
 
-pub(crate) fn get_exe_name_and_dir() -> (Option<String>, Option<PathBuf>) {
+pub(super) fn get_exe_name_and_dir() -> (Option<String>, Option<PathBuf>) {
     match current_exe() {
         Ok(path) => (
             path.file_stem().map(|exe| exe.to_string_lossy().into_owned()),
@@ -17,9 +19,10 @@ pub(crate) fn get_exe_name_and_dir() -> (Option<String>, Option<PathBuf>) {
     }
 }
 
-pub(crate) fn get_settings_file(exe: &Option<String>, dir: &Option<PathBuf>, name: &Option<String>) -> Result<PathBuf> {
+pub(super) fn get_settings_file(exe: &Option<String>, dir: &Option<PathBuf>, options: &Options) -> Result<SettingsFile> {
     let extension = "toml";
     let fallback_filename = "settings.toml";
+    let name = &options.settings;
     let filename = match name {
         Some(name) => match Path::new(name).file_stem() {
             Some(filename) => format!("{}.{extension}", filename.to_string_lossy()),
@@ -33,7 +36,7 @@ pub(crate) fn get_settings_file(exe: &Option<String>, dir: &Option<PathBuf>, nam
             }
         },
     };
-    let settings_file = match name {
+    let settings_file_path = match name {
         Some(name) => match Path::new(name).parent() {
             Some(path) => path.join(filename),
             None => PathBuf::from(&filename),
@@ -46,10 +49,37 @@ pub(crate) fn get_settings_file(exe: &Option<String>, dir: &Option<PathBuf>, nam
             }
         },
     };
+    let settings_file = SettingsFile {
+        path: settings_file_path,
+        version_message: None,
+        write: options.settings_write,
+        backup_path: PathBuf::new(),
+        backup_written: false,
+        backup_overwritten: false,
+    };
     Ok(settings_file)
 }
 
-pub(crate) fn get_log_file(no_log: bool, name: String, exe: Option<String>, dir: Option<PathBuf>) -> Result<Option<PathBuf>> {
+pub(super) fn backup_settings_file(settings_file: &mut SettingsFile, backup_suffix: &str) -> Result<u64> {
+    if settings_file.path.exists() {
+        let mut backup_path = settings_file.path.clone().into_os_string();
+        backup_path.push(backup_suffix);
+        settings_file.backup_path = backup_path.into();
+        settings_file.backup_overwritten = settings_file.backup_path.exists();
+        settings_file.backup_written = true;
+        copy(&settings_file.path, &settings_file.backup_path).with_context(|| {
+            format!(
+                "Failed to backup program settings \"{}\" to \"{}\"",
+                &settings_file.path.display(),
+                &settings_file.backup_path.display()
+            )
+        })
+    } else {
+        Ok(0)
+    }
+}
+
+pub(super) fn get_log_file(no_log: bool, name: String, exe: Option<String>, dir: Option<PathBuf>) -> Result<Option<PathBuf>> {
     if no_log {
         return Ok(None);
     }
@@ -84,7 +114,7 @@ pub(crate) fn get_log_file(no_log: bool, name: String, exe: Option<String>, dir:
     Ok(Some(log))
 }
 
-pub(crate) fn get_color(color: &str) -> Result<Style> {
+pub(super) fn get_color(color: &str) -> Result<Style> {
     let style = match color {
         "blue" => Style::new().blue(),
         "cyan" => Style::new().cyan(),
@@ -98,24 +128,43 @@ pub(crate) fn get_color(color: &str) -> Result<Style> {
     Ok(style)
 }
 
-pub(crate) fn get_progress_frequency(frequency: u8) -> Result<u8> {
+pub(super) fn get_progress_frequency(frequency: u8) -> Result<u8> {
     match frequency {
         f if f > 0 && f <= 10 => Ok(frequency),
         _ => Err(anyhow!("Progress frequency must be between 1 and 10 Hz")),
     }
 }
 
-pub(crate) fn get_output_file(opt: &Options, set: &Settings) -> Result<OutputFile> {
+pub(super) fn get_output_file(opt: &Options, set: &Settings, kind: PluginKind) -> Result<OutputFile> {
     macro_rules! name_parse_error {
         ($name:ident, $part:expr) => {
             return Err(anyhow!("Failed to parse {} from output plugin name: \"{}\"", $part, $name,))
         };
     }
-    let raw_path = match &opt.output {
+    let (opt_output, set_options_output) = match kind {
+        PluginKind::Merge => (&opt.output, &set.options.output),
+        PluginKind::Delev => (&opt.delev_output, &set.options.delev_output),
+    };
+    let mut raw_path = match opt_output {
         Some(name) => name,
-        None => &set.options.output,
+        None => set_options_output,
     };
     let mut path = PathBuf::from(&raw_path);
+    if raw_path.is_empty() && matches!(kind, PluginKind::Delev) {
+        raw_path = match &opt.output {
+            Some(name) => name,
+            None => &set.options.output,
+        };
+        path = PathBuf::from(&raw_path);
+        let stem = match path.file_stem() {
+            Some(stem) => stem.to_string_lossy(),
+            None => name_parse_error!(raw_path, "file name without extension"),
+        };
+        path.set_file_name(format!(
+            "{}{}{}",
+            stem, &set.guts.output_date_separators[0], &set.guts.delev_output_infix_default
+        ));
+    };
     let dir_path = match &opt.output_dir {
         Some(path) => PathBuf::from(&path),
         None => match &set.options.output_dir.is_empty() {
@@ -162,9 +211,79 @@ pub(crate) fn get_output_file(opt: &Options, set: &Settings) -> Result<OutputFil
         path = dir_path.join(&name);
     };
     Ok(OutputFile {
+        kind,
         name,
         name_lowercased_starts_with,
         path,
         dir_path,
     })
+}
+
+pub(super) fn get_delev_to(lvl: u16) -> Result<u16> {
+    match lvl {
+        0 => Err(anyhow!("Level to delevel to should be larger than 0")),
+        _ => Ok(lvl),
+    }
+}
+
+pub(super) fn get_kind_delev_to(lvl: u16, kind_lvl: u16) -> u16 {
+    if kind_lvl != 0 {
+        kind_lvl
+    } else {
+        lvl
+    }
+}
+
+pub(super) fn check_verboseness(verboseness: u8, name: &str) -> Result<u8> {
+    let verboseness_limit = 10;
+    match verboseness {
+        f if f <= verboseness_limit => Ok(verboseness),
+        _ => match name {
+            "opt.verbose" => Err(anyhow!("Verbose argument should be passed no more than {verboseness_limit} times")),
+            _ => Err(anyhow!(
+                "Verboseness \"{}\" should be less than or equal to {verboseness_limit}",
+                name
+            )),
+        },
+    }
+}
+
+pub(super) fn prepare_plugin_extensions_to_ignore(list: Vec<String>) -> Vec<String> {
+    let mut res = Vec::new();
+    for extension in list.iter() {
+        let mut prepared = extension.to_lowercase();
+        prepared.insert(0, '.');
+        res.push(prepared)
+    }
+    res
+}
+
+pub(super) fn append_default_to_skip(mut skip: Vec<String>, default: &[String]) -> Vec<String> {
+    skip.extend(default.iter().map(|x| x.to_lowercase()));
+    skip
+}
+
+pub(super) fn check_settings_version(settings_file: &mut SettingsFile) -> Result<()> {
+    if settings_file.path.exists() {
+        let settings_toml_lines = read_lines(&settings_file.path)
+            .with_context(|| format!("Failed to read program configuration file \"{}\"", &settings_file.path.display()))?;
+        let settings_version_prefix = "# # Settings version: ";
+        let expected_settings_version = String::from("0.2.0");
+        let mut detected_settings_version = String::from("0.1.0");
+        for line in settings_toml_lines.flatten() {
+            if line.starts_with(settings_version_prefix) {
+                let version_raw = &line.strip_prefix(settings_version_prefix);
+                if let Some(version_raw) = version_raw {
+                    detected_settings_version = version_raw.trim().to_owned();
+                    break;
+                }
+            }
+        }
+        if detected_settings_version != expected_settings_version {
+            settings_file.version_message =  Some(
+                format!("Attention: Program configuration file \"{}\" version differs from expected:\n  Expected version = \"{}\", detected version = \"{}\".\n  Consider recreating it with \"--settings-write\".\n  File will be backed up and then overwritten, though better make backup yourself if you need it.", &settings_file.path.display(), expected_settings_version, detected_settings_version),
+            );
+        }
+    }
+    Ok(())
 }

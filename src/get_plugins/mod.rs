@@ -1,12 +1,13 @@
-use crate::{err_or_ignore, err_or_ignore_thread_safe, msg, Cfg, Log, MsgTone};
+use crate::{err_or_ignore, err_or_ignore_thread_safe, msg, read_lines, Cfg, Log, MsgTone};
 use anyhow::{anyhow, Context, Result};
+use fs_err::read_dir;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::{
     collections::{hash_map::Entry, HashMap},
-    fs::{self, File},
-    io::{self, BufRead},
     path::{Path, PathBuf},
 };
+mod get_game_config;
+use get_game_config::get_game_config;
 
 #[derive(PartialEq)]
 pub(crate) struct PluginInfo {
@@ -29,11 +30,12 @@ struct Helper {
     skipped_plugin_numbers: Vec<usize>,
 }
 
-pub(crate) fn get_plugins(config_path: &Path, cfg: &Cfg, log: &mut Log) -> Result<Vec<PluginInfo>> {
-    let text = format!("Gathering plugins from game configuration file \"{}\"", config_path.display());
+pub(super) fn get_plugins(cfg: &Cfg, log: &mut Log) -> Result<Vec<PluginInfo>> {
+    let config_path = get_game_config(cfg, log).with_context(|| "Failed to get game configuration file")?;
+    let text = format!("Gathering plugins from game configuration file \"{}\"", &config_path.display());
     msg(text, MsgTone::Neutral, 1, cfg, log)?;
     let config_lines =
-        read_lines(config_path).with_context(|| format!("Failed to read game configuration file \"{}\"", config_path.display()))?;
+        read_lines(&config_path).with_context(|| format!("Failed to read game configuration file \"{}\"", &config_path.display()))?;
     let mut res: Vec<PluginInfo> = Vec::new();
     let mut helper: Helper = Helper::default();
     let mut omw_data_dirs: Vec<(usize, PathBuf)> = Vec::new();
@@ -41,7 +43,7 @@ pub(crate) fn get_plugins(config_path: &Path, cfg: &Cfg, log: &mut Log) -> Resul
     for line in config_lines.flatten() {
         if !helper.omw_found && line.starts_with(&cfg.guts.mor_line_beginning_content) {
             if !helper.mor_data_files_dir_found {
-                mor_get_data_files_dir(config_path, &mut helper, cfg)
+                mor_get_data_files_dir(&config_path, &mut helper, cfg)
                     .with_context(|| "Failed to find Morrowind's \"Data Files\" directory")?;
             }
             mor_get_plugin(&line, &mut res, &mut helper, cfg, log).with_context(|| "Failed to find Morrowind's plugin")?;
@@ -61,18 +63,17 @@ pub(crate) fn get_plugins(config_path: &Path, cfg: &Cfg, log: &mut Log) -> Resul
             }
         }
     }
+    if res.is_empty() {
+        error_none_listed(&config_path)?;
+    }
     if cfg.skip_last > 0 {
         skip_last_plugins(&mut res, &helper, cfg, log).with_context(|| format!("Failed to skip last {} plugins", cfg.skip_last))?;
     }
-    Ok(res)
-}
-
-fn read_lines<P>(filename: P) -> Result<io::Lines<io::BufReader<File>>>
-where
-    P: AsRef<Path>,
-{
-    let file = File::open(&filename).with_context(|| format!("Failed to open file \"{}\"", filename.as_ref().display()))?;
-    Ok(io::BufReader::new(file).lines())
+    if res.is_empty() {
+        error_none_listed(&config_path)
+    } else {
+        Ok(res)
+    }
 }
 
 fn get_all_plugins(omw_data_dirs: &[(usize, PathBuf)], helper: &mut Helper, cfg: &Cfg) -> Result<HashMap<String, PathBuf>> {
@@ -80,7 +81,7 @@ fn get_all_plugins(omw_data_dirs: &[(usize, PathBuf)], helper: &mut Helper, cfg:
         .par_iter()
         .map(|(id, dir_path)| -> Result<Vec<(usize, String, PathBuf)>, _> {
             let mut res: Vec<(usize, String, PathBuf)> = Vec::new();
-            match fs::read_dir(dir_path) {
+            match read_dir(dir_path) {
                 Ok(dir_contents) => {
                     for entry in dir_contents.flatten() {
                         let path = entry.path();
@@ -193,15 +194,22 @@ fn omw_get_plugin(
 ) -> Result<()> {
     if let Some(raw_name) = line.split('=').nth(1) {
         if let Some((name, name_lowercased)) = skip_filtered_plugins(raw_name, helper, cfg, log)? {
-            if let Some(path) = omw_all_plugins.get(&name) {
-                res.push(PluginInfo {
-                    name,
-                    name_lowercased,
-                    path: path.clone(),
-                });
-            } else {
-                let text = format!("Failed to find plugin \"{name}\"");
-                err_or_ignore(text, cfg, log)?;
+            if !cfg
+                .guts
+                .plugin_extensions_to_ignore
+                .iter()
+                .any(|ext| name_lowercased.ends_with(ext))
+            {
+                if let Some(path) = omw_all_plugins.get(&name) {
+                    res.push(PluginInfo {
+                        name,
+                        name_lowercased,
+                        path: path.clone(),
+                    });
+                } else {
+                    let text = format!("Failed to find plugin \"{name}\"");
+                    err_or_ignore(text, cfg, log)?;
+                }
             }
         }
     }
@@ -223,6 +231,16 @@ fn skip_filtered_plugins(raw_name: &str, helper: &mut Helper, cfg: &Cfg, log: &m
     } else if name_lowercased.starts_with(&cfg.output.name_lowercased_starts_with) {
         format!(
             "Plugin \"{}\" will be skipped, because it's name matches output plugin name pattern \"{}\"",
+            name, cfg.output.name_lowercased_starts_with
+        )
+    } else if cfg.delev && cfg.delev_distinct && name == cfg.delev_output.name {
+        format!(
+            "Plugin \"{}\" will be skipped, because it has the same name as the delev output plugin",
+            name
+        )
+    } else if cfg.delev && cfg.delev_distinct && name_lowercased.starts_with(&cfg.delev_output.name_lowercased_starts_with) {
+        format!(
+            "Plugin \"{}\" will be skipped, because it's name matches delev output plugin name pattern \"{}\"",
             name, cfg.output.name_lowercased_starts_with
         )
     } else if cfg.skip.contains(&name_lowercased) {
@@ -280,4 +298,11 @@ fn skip_last_plugins(res: &mut Vec<PluginInfo>, helper: &Helper, cfg: &Cfg, log:
             cfg.skip_last
         ))
     }
+}
+
+fn error_none_listed(config_path: &Path) -> Result<Vec<PluginInfo>> {
+    Err(anyhow!(
+        "None plugins listed in game configuration file: \"{}\"",
+        config_path.display()
+    ))
 }

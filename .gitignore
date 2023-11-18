@@ -5,9 +5,8 @@
 !/Cargo.lock
 !/Cargo.toml
 !/README.md
-!/COPYING
-!/UNLICENSE
-!/LICENSE-MIT
+!/CHANGELOG.md
+!/LICENSE
 !/.gitignore
 !/release.sh
 !/rustfmt.toml

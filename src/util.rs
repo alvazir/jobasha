@@ -1,12 +1,44 @@
-use crate::{Cfg, ListCounts};
+use crate::Cfg;
 use anyhow::{anyhow, Context, Result};
+use fs_err::{copy, create_dir_all, File};
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use std::{
-    fs::{create_dir_all, File},
-    io::{self, BufWriter, Write},
-    path::Path,
+    io::{self, BufRead, BufWriter, Write},
+    path::{Path, PathBuf},
     time::Instant,
 };
+
+#[derive(Default)]
+pub(crate) struct ListCounts {
+    pub(crate) total: ListCountsTotal,
+    pub(crate) merge: ListCountsMerge,
+    pub(crate) delev: ListCountsDelev,
+}
+
+#[derive(Default)]
+pub(crate) struct ListCountsTotal {
+    pub(crate) total: usize,
+    pub(crate) unique: usize,
+    pub(crate) placed: usize,
+    pub(crate) master: usize,
+}
+
+#[derive(Default)]
+pub(crate) struct ListCountsMerge {
+    pub(crate) merged: usize,
+    pub(crate) placed: usize,
+    pub(crate) untouched: usize,
+    pub(crate) master: usize,
+    pub(crate) deleted_subrecord: usize,
+}
+
+#[derive(Default)]
+pub(crate) struct ListCountsDelev {
+    pub(crate) deleveled: usize,
+    pub(crate) placed: usize,
+    pub(crate) master: usize,
+    pub(crate) deleveled_subrecord: usize,
+}
 
 pub(crate) enum MsgTone {
     Neutral,
@@ -20,7 +52,7 @@ macro_rules! msg {
     ($text:ident, $tone:ident, $verbose:ident, $cfg:ident) => {
         if !($cfg.quiet || $verbose > $cfg.verbose) {
             let text = $text.as_ref();
-            if $cfg.no_color {
+            if !$cfg.color {
                 eprintln!("{text}");
             } else {
                 match $tone {
@@ -103,7 +135,7 @@ pub(crate) struct Progress {
 
 impl Progress {
     pub(crate) fn new(plugins_num: usize, cfg: &Cfg) -> Progress {
-        let off = cfg.quiet || cfg.no_progress;
+        let off = cfg.quiet || !cfg.progress;
         let period_ms = 1000.0 / cfg.guts.progress_frequency as f64;
         Progress {
             off,
@@ -133,9 +165,9 @@ fn get_progress_bar(off: bool, plugins_num: usize, cfg: &Cfg) -> ProgressBar {
         ProgressBar::with_draw_target(None, ProgressDrawTarget::hidden())
     } else {
         let target = ProgressDrawTarget::stderr_with_hz(cfg.guts.progress_frequency);
-        let template = match cfg.no_progress_bar {
-            true => &cfg.guts.progress_template,
-            false => &cfg.guts.progress_bar_template,
+        let template = match cfg.progress_bar {
+            true => &cfg.guts.progress_bar_template,
+            false => &cfg.guts.progress_template,
         };
         let style = ProgressStyle::with_template(template)
             .unwrap()
@@ -160,10 +192,15 @@ impl Log {
                 Some(log) => log,
             };
             create_dir_early(log, "log")?;
+            let log_backup_message = backup_log_file(log, &cfg.guts.log_backup_suffix);
             let buffer = Some(BufWriter::new(
                 File::create(log).with_context(|| format!("Failed to create/open log file \"{}\"", log.display()))?,
             ));
-            Ok(Log { buffer })
+            let mut result = Log { buffer };
+            if !log_backup_message.is_empty() {
+                msg(log_backup_message, MsgTone::Warm, 1, cfg, &mut result)?;
+            }
+            Ok(result)
         } else {
             Ok(Log { buffer: None })
         }
@@ -179,15 +216,7 @@ impl Log {
     }
 }
 
-pub(crate) fn show_output_plugin_suggestion(counts: &ListCounts, cfg: &Cfg, log: &mut Log) -> Result<()> {
-    if !cfg.dry_run && counts.placed != 0 {
-        let text = format!("\nPlace \"{}\" last in load order and activate\n", cfg.output.name);
-        msg(text, MsgTone::Warm, 0, cfg, log)?;
-    }
-    Ok(())
-}
-
-pub(crate) fn show_log_path(cfg: &Cfg, log: &mut Log) -> Result<()> {
+pub(super) fn show_log_path(cfg: &Cfg, log: &mut Log) -> Result<()> {
     if cfg.no_log {
         Ok(())
     } else {
@@ -205,17 +234,25 @@ pub(crate) fn show_log_path(cfg: &Cfg, log: &mut Log) -> Result<()> {
     }
 }
 
-pub(crate) fn show_settings_written(cfg: &Cfg, log: &mut Log) -> Result<()> {
-    msg(
-        format!("Wrote default program settings into \"{}\"", cfg.settings.display()),
-        MsgTone::Good,
-        0,
-        cfg,
-        log,
-    )
+pub(super) fn show_settings_written(cfg: &Cfg, log: &mut Log) -> Result<()> {
+    let mut text = String::with_capacity(128);
+    if cfg.settings_file.backup_written {
+        text.push_str(&format!(
+            "Settings file backup was written to \"{}\"{}",
+            cfg.settings_file.backup_path.display(),
+            if cfg.settings_file.backup_overwritten {
+                ", previous backup was overwritten"
+            } else {
+                ""
+            },
+        ));
+        msg(text, MsgTone::Warm, 0, cfg, log)?;
+    }
+    text = format!("Wrote default program settings into \"{}\"", cfg.settings_file.path.display());
+    msg(text, MsgTone::Good, 0, cfg, log)
 }
 
-pub(crate) fn create_dir_early(path: &Path, name: &str) -> Result<()> {
+pub(super) fn create_dir_early(path: &Path, name: &str) -> Result<()> {
     match path.parent() {
         None => {}
         Some(dir) => {
@@ -230,4 +267,59 @@ pub(crate) fn create_dir_early(path: &Path, name: &str) -> Result<()> {
         }
     }
     Ok(())
+}
+
+pub(super) fn get_plugin_size(path: &Path, cfg: &Cfg, log: &mut Log) -> Result<u64> {
+    match path.metadata() {
+        Ok(meta) => Ok(meta.len()),
+        Err(error) => {
+            let text = format!("Failed to get the size of \"{}\" with error \"{}\"", path.display(), error);
+            err_or_ignore(text, cfg, log)?;
+            Ok(0)
+        }
+    }
+}
+
+pub(super) fn plural(word: &str, count: usize) -> Result<&str> {
+    macro_rules! if_plural {
+        ($plural:ident, $singular:expr) => {
+            if count > 1 {
+                $plural
+            } else {
+                $singular
+            }
+        };
+    }
+    let res = match word {
+        "s" => if_plural!(word, ""),
+        "were" => if_plural!(word, "was"),
+        "have" => if_plural!(word, "has"),
+        "is" => if_plural!(word, "are"),
+        "these" => if_plural!(word, "this"),
+        _ => return Err(anyhow!("Bug: Failed to match plural word")),
+    };
+    Ok(res)
+}
+
+pub(super) fn read_lines(filename: &Path) -> Result<io::Lines<io::BufReader<File>>> {
+    let file = File::open(filename).with_context(|| format!("Failed to open file \"{}\"", filename.display()))?;
+    Ok(io::BufReader::new(file).lines())
+}
+
+pub(super) fn show_settings_version_message(cfg: &Cfg, log: &mut Log) -> Result<()> {
+    if let Some(message) = &cfg.settings_file.version_message {
+        msg(message, MsgTone::Bad, 0, cfg, log)
+    } else {
+        Ok(())
+    }
+}
+
+fn backup_log_file(log_file: &PathBuf, backup_suffix: &str) -> String {
+    let mut backup_path = log_file.clone().into_os_string();
+    backup_path.push(backup_suffix);
+    let backup_file: PathBuf = backup_path.into();
+    match copy(log_file, &backup_file) {
+        Ok(_) => format!("Previous log file was saved to \"{}\"", backup_file.display()),
+        Err(_) => String::new(),
+    }
 }

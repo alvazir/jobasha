@@ -1,14 +1,19 @@
 use crate::create_dir_early;
 use anyhow::{anyhow, Context, Result};
+use confique::toml::{template, FormatOptions};
 use console::Style;
-use std::{ffi::OsString, fs, path::PathBuf};
+use fs_err::write;
+use std::{ffi::OsString, path::PathBuf};
 mod options;
 mod settings;
 mod util;
-use confique::toml::{template, FormatOptions};
 use options::{get_options, Options};
 use settings::{get_settings, Settings};
-use util::{get_color, get_exe_name_and_dir, get_log_file, get_output_file, get_progress_frequency, get_settings_file};
+use util::{
+    append_default_to_skip, backup_settings_file, check_settings_version, check_verboseness, get_color, get_delev_to,
+    get_exe_name_and_dir, get_kind_delev_to, get_log_file, get_output_file, get_progress_frequency, get_settings_file,
+    prepare_plugin_extensions_to_ignore,
+};
 
 pub(crate) struct Cfg {
     pub(crate) config: String,
@@ -16,8 +21,7 @@ pub(crate) struct Cfg {
     pub(crate) dry_run: bool,
     pub(crate) log: Option<PathBuf>,
     pub(crate) no_log: bool,
-    pub(crate) settings: PathBuf,
-    pub(crate) settings_write: bool,
+    pub(crate) settings_file: SettingsFile,
     pub(crate) ignore_errors: bool,
     pub(crate) all_lists: bool,
     pub(crate) skip_last: usize,
@@ -29,22 +33,42 @@ pub(crate) struct Cfg {
     pub(crate) always_delete: Vec<String>,
     pub(crate) never_delete: Vec<String>,
     pub(crate) no_threshold_warnings: bool,
+    pub(crate) delev: bool,
+    pub(crate) delev_distinct: bool,
+    pub(crate) delev_output: OutputFile,
     pub(crate) verbose: u8,
     pub(crate) quiet: bool,
-    pub(crate) no_color: bool,
-    pub(crate) no_progress: bool,
-    pub(crate) no_progress_bar: bool,
+    pub(crate) progress: bool,
+    pub(crate) progress_bar: bool,
+    pub(crate) color: bool,
     pub(crate) no_summary: bool,
     pub(crate) guts: Guts,
+}
+
+pub(crate) struct SettingsFile {
+    pub(crate) path: PathBuf,
+    pub(crate) version_message: Option<String>,
+    pub(crate) write: bool,
+    pub(crate) backup_path: PathBuf,
+    pub(crate) backup_written: bool,
+    pub(crate) backup_overwritten: bool,
 }
 
 pub(crate) struct Kind {
     pub(crate) no: bool,
     pub(crate) threshold: f64,
     pub(crate) log_t: String,
+    pub(crate) no_delev: bool,
+    pub(crate) delev_to: u16,
+}
+
+pub(crate) enum PluginKind {
+    Merge,
+    Delev,
 }
 
 pub(crate) struct OutputFile {
+    pub(crate) kind: PluginKind,
     pub(crate) name: String,
     pub(crate) name_lowercased_starts_with: String,
     pub(crate) path: PathBuf,
@@ -64,9 +88,13 @@ pub(crate) struct Guts {
     pub(crate) omw_line_beginning_content: String,
     pub(crate) omw_line_beginning_data: String,
     pub(crate) omw_plugin_extensions: Vec<OsString>,
+    pub(crate) plugin_extensions_to_ignore: Vec<String>,
     pub(crate) header_version: f32,
     pub(crate) header_author: String,
-    pub(crate) header_description: String,
+    pub(crate) header_description_merge: String,
+    pub(crate) header_description_delev: String,
+    pub(crate) header_description_merge_and_delev: String,
+    pub(crate) log_backup_suffix: String,
     pub(crate) progress_frequency: u8,
     pub(crate) progress_prefix: String,
     pub(crate) progress_template: String,
@@ -75,14 +103,17 @@ pub(crate) struct Guts {
     pub(crate) auto_resolve_lower_limit: f64,
     pub(crate) prefix_ignored_error_message: String,
     pub(crate) suffix_add_ignore_errors_suggestion: String,
-    pub(crate) suffix_add_v_suggestion: String,
-    pub(crate) suffix_add_2v_suggestion: String,
-    pub(crate) suffix_add_v_suggestion_no_log: String,
-    pub(crate) suffix_add_2v_suggestion_no_log: String,
+    pub(crate) details_line_approximate_length: usize,
+    pub(crate) verboseness_details_deleted_subrecords: u8,
+    pub(crate) verboseness_details_untouched_lists: u8,
+    pub(crate) verboseness_details_threshold_resolved: u8,
+    pub(crate) verboseness_details_threshold_skipped: u8,
+    pub(crate) verboseness_details_threshold_warnings: u8,
+    pub(crate) verboseness_details_deleveled_subrecords: u8,
 }
 
 impl Cfg {
-    fn new(opt: Options, set: Settings, settings_file: PathBuf, exe: Option<String>, dir: Option<PathBuf>) -> Result<Cfg> {
+    fn new(opt: Options, set: Settings, settings_file: SettingsFile, exe: Option<String>, dir: Option<PathBuf>) -> Result<Cfg> {
         macro_rules! opt_or_set_bool {
             ($name:ident) => {
                 match opt.$name {
@@ -123,39 +154,60 @@ impl Cfg {
                 $name.iter().map(|ext| ext.to_lowercase().into()).collect()
             };
         }
+        macro_rules! get_verbose {
+            ($name:expr) => {
+                check_verboseness($name, stringify!($name))?
+            };
+        }
         let no_log = opt_or_set_bool!(no_log);
+        let delev_to = get_delev_to(opt_or_set_some!(delev_to))?;
+        let no_skip_default = opt_or_set_bool!(no_skip_default);
         Ok(Cfg {
-            output: get_output_file(&opt, &set)?,
+            output: get_output_file(&opt, &set, PluginKind::Merge)?,
+            delev_output: get_output_file(&opt, &set, PluginKind::Delev)?,
             config: opt_or_set_some!(config),
             dry_run: opt_or_set_bool!(dry_run),
             no_log,
             log: get_log_file(no_log, opt_or_set_some!(log), exe, dir)?,
-            settings: settings_file,
-            settings_write: opt.settings_write,
+            settings_file,
             ignore_errors: opt_or_set_bool!(ignore_errors),
             all_lists: opt_or_set_bool!(all_lists),
             skip_last: opt_or_set_some!(skip_last),
-            skip: opt_or_set_vec_lowercase!(skip),
+            skip: if no_skip_default {
+                opt_or_set_vec_lowercase!(skip)
+            } else {
+                append_default_to_skip(opt_or_set_vec_lowercase!(skip), &set.guts.skip_default)
+            },
             creatures: Kind {
                 no: opt_or_set_bool!(no_creatures),
                 threshold: opt_or_set_threshold!(threshold_creatures, "threshold_creatures"),
                 log_t: set.guts.log_t_creature,
+                no_delev: opt_or_set_bool!(delev_no_creatures),
+                delev_to: get_kind_delev_to(delev_to, opt_or_set_some!(delev_creatures_to)),
             },
             items: Kind {
                 no: opt_or_set_bool!(no_items),
                 threshold: opt_or_set_threshold!(threshold_items, "threshold_items"),
                 log_t: set.guts.log_t_item,
+                no_delev: opt_or_set_bool!(delev_no_items),
+                delev_to: get_kind_delev_to(delev_to, opt_or_set_some!(delev_items_to)),
             },
             no_delete: opt_or_set_bool!(no_delete),
             extended_delete: opt_or_set_bool!(extended_delete),
             always_delete: opt_or_set_vec_lowercase!(always_delete),
             never_delete: opt_or_set_vec_lowercase!(never_delete),
             no_threshold_warnings: opt_or_set_bool!(no_threshold_warnings),
-            verbose: if opt.verbose == 0 { set.options.verbose } else { opt.verbose },
+            delev: opt_or_set_bool!(delev),
+            delev_distinct: opt_or_set_bool!(delev_distinct),
+            verbose: if opt.verbose == 0 {
+                get_verbose!(set.options.verbose)
+            } else {
+                get_verbose!(opt.verbose)
+            },
             quiet: opt_or_set_bool!(quiet),
-            no_color: opt_or_set_bool!(no_color),
-            no_progress: opt_or_set_bool!(no_progress),
-            no_progress_bar: opt_or_set_bool!(no_progress_bar),
+            progress: opt_or_set_bool!(progress) || opt_or_set_bool!(progress_bar),
+            progress_bar: opt_or_set_bool!(progress_bar),
+            color: opt_or_set_bool!(color),
             no_summary: opt_or_set_bool!(no_summary),
             guts: Guts {
                 color_suggestion: get_color(&set.guts.color_suggestion)?,
@@ -170,9 +222,13 @@ impl Cfg {
                 omw_line_beginning_content: set.guts.omw_line_beginning_content,
                 omw_line_beginning_data: set.guts.omw_line_beginning_data,
                 omw_plugin_extensions: set_ext!(set.guts.omw_plugin_extensions),
+                plugin_extensions_to_ignore: prepare_plugin_extensions_to_ignore(set.guts.plugin_extensions_to_ignore),
                 header_version: set.guts.header_version,
                 header_author: set.guts.header_author,
-                header_description: set.guts.header_description,
+                header_description_merge: set.guts.header_description_merge,
+                header_description_delev: set.guts.header_description_delev,
+                header_description_merge_and_delev: set.guts.header_description_merge_and_delev,
+                log_backup_suffix: set.guts.log_backup_suffix,
                 progress_frequency: get_progress_frequency(set.guts.progress_frequency)?,
                 progress_prefix: set.guts.progress_prefix,
                 progress_template: set.guts.progress_template,
@@ -181,26 +237,29 @@ impl Cfg {
                 auto_resolve_lower_limit: set.guts.auto_resolve_lower_limit,
                 prefix_ignored_error_message: set.guts.prefix_ignored_error_message,
                 suffix_add_ignore_errors_suggestion: set.guts.suffix_add_ignore_errors_suggestion,
-                suffix_add_v_suggestion: set.guts.suffix_add_v_suggestion,
-                suffix_add_2v_suggestion: set.guts.suffix_add_2v_suggestion,
-                suffix_add_v_suggestion_no_log: set.guts.suffix_add_v_suggestion_no_log,
-                suffix_add_2v_suggestion_no_log: set.guts.suffix_add_2v_suggestion_no_log,
+                details_line_approximate_length: set.guts.details_line_approximate_length,
+                verboseness_details_deleted_subrecords: get_verbose!(set.guts.verboseness_details_deleted_subrecords),
+                verboseness_details_untouched_lists: get_verbose!(set.guts.verboseness_details_untouched_lists),
+                verboseness_details_threshold_resolved: get_verbose!(set.guts.verboseness_details_threshold_resolved),
+                verboseness_details_threshold_skipped: get_verbose!(set.guts.verboseness_details_threshold_skipped),
+                verboseness_details_threshold_warnings: get_verbose!(set.guts.verboseness_details_threshold_warnings),
+                verboseness_details_deleveled_subrecords: get_verbose!(set.guts.verboseness_details_deleveled_subrecords),
             },
         })
     }
 }
 
-pub(crate) fn get_self_config() -> Result<Cfg> {
+pub(super) fn get_self_config() -> Result<Cfg> {
     let options = get_options()?;
     let (exe, dir) = get_exe_name_and_dir();
-    let settings_file =
-        get_settings_file(&exe, &dir, &options.settings).with_context(|| "Failed to get program settings file path")?;
-    let settings = get_settings(&settings_file).with_context(|| "Failed to get default or provided settings")?;
+    let mut settings_file = get_settings_file(&exe, &dir, &options).with_context(|| "Failed to get program settings file path")?;
+    let settings = get_settings(&mut settings_file).with_context(|| "Failed to get default or provided settings")?;
     if options.settings_write {
         let toml = template::<Settings>(FormatOptions::default());
-        create_dir_early(&settings_file, "settings")?;
-        fs::write(&settings_file, toml)
-            .with_context(|| format!("Failed to write default program settings into \"{}\"", settings_file.display()))?;
+        create_dir_early(&settings_file.path, "settings")?;
+        backup_settings_file(&mut settings_file, &settings.guts.settings_backup_suffix)?;
+        write(&settings_file.path, toml)
+            .with_context(|| format!("Failed to write default program settings into \"{}\"", settings_file.path.display()))?;
     }
     let configuration = Cfg::new(options, settings, settings_file, exe, dir).with_context(|| "Failed to configure program")?;
     Ok(configuration)
