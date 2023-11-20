@@ -26,6 +26,8 @@ pub(crate) struct Cfg {
     pub(crate) all_lists: bool,
     pub(crate) skip_last: usize,
     pub(crate) skip: Vec<String>,
+    pub(crate) skip_unexpected_tags: bool,
+    pub(crate) no_skip_unexpected_tags_default: bool,
     pub(crate) creatures: Kind,
     pub(crate) items: Kind,
     pub(crate) no_delete: bool,
@@ -89,6 +91,7 @@ pub(crate) struct Guts {
     pub(crate) omw_line_beginning_data: String,
     pub(crate) omw_plugin_extensions: Vec<OsString>,
     pub(crate) plugin_extensions_to_ignore: Vec<String>,
+    pub(crate) skip_unexpected_tags_default: Vec<String>,
     pub(crate) header_version: f32,
     pub(crate) header_author: String,
     pub(crate) header_description_merge: String,
@@ -178,6 +181,8 @@ impl Cfg {
             } else {
                 append_default_to_skip(opt_or_set_vec_lowercase!(skip), &set.guts.skip_default)
             },
+            skip_unexpected_tags: opt_or_set_bool!(skip_unexpected_tags),
+            no_skip_unexpected_tags_default: opt_or_set_bool!(no_skip_unexpected_tags_default),
             creatures: Kind {
                 no: opt_or_set_bool!(no_creatures),
                 threshold: opt_or_set_threshold!(threshold_creatures, "threshold_creatures"),
@@ -223,6 +228,7 @@ impl Cfg {
                 omw_line_beginning_data: set.guts.omw_line_beginning_data,
                 omw_plugin_extensions: set_ext!(set.guts.omw_plugin_extensions),
                 plugin_extensions_to_ignore: prepare_plugin_extensions_to_ignore(set.guts.plugin_extensions_to_ignore),
+                skip_unexpected_tags_default: set.guts.skip_unexpected_tags_default.iter().map(|tag| tag.to_lowercase()).collect(),
                 header_version: set.guts.header_version,
                 header_author: set.guts.header_author,
                 header_description_merge: set.guts.header_description_merge,

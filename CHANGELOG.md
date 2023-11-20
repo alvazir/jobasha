@@ -3,6 +3,12 @@
 <!-- markdownlint-disable MD036 -->
 # Changelog
 
+## 0.2.1 (2023-11-20)
+
+Fixes
+
+* Ignore plugins that contain non-TES3 record types(LUAL) automatically thanks to GeneralUlfric's report.
+
 ## 0.2.0 (2023-11-18)
 
 **Breaking changes**

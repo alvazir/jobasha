@@ -44,6 +44,10 @@ pub(super) struct Options {
     #[config(default = false)]
     pub(super) no_skip_default: bool,
     #[config(default = false)]
+    pub(super) skip_unexpected_tags: bool,
+    #[config(default = false)]
+    pub(super) no_skip_unexpected_tags_default: bool,
+    #[config(default = false)]
     pub(super) no_creatures: bool,
     #[config(default = false)]
     pub(super) no_items: bool,
@@ -107,7 +111,7 @@ pub(super) struct Guts {
     /// Guts of the program. Use at your own risk ;-)
     ///
     /// # Following line is used to determine version of used settings to warn about outdated version:
-    /// # Settings version: 0.2.0
+    /// # Settings version: 0.2.1
     ///
     /// [Colors]
     /// Available colors are: blue, cyan, green, magenta, red, yellow, none.
@@ -159,6 +163,9 @@ pub(super) struct Guts {
     /// Following plugins are skipped unless --no-skip-default is set.
     #[config(default = ["Merged Objects.esp", "merged.omwaddon"])]
     pub(super) skip_default: Vec<String>,
+    /// Plugins with the following record types are skipped unless --no-skip-unexpected-tags-default is set.
+    #[config(default = ["LUAL"])]
+    pub(super) skip_unexpected_tags_default: Vec<String>,
     ///
     /// [Date]
     ///

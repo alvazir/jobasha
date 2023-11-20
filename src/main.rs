@@ -58,7 +58,7 @@ fn run() -> Result<bool> {
     }
     show_settings_version_message(&cfg, &mut log)?;
     let plugins = get_plugins(&cfg, &mut log).with_context(|| "Failed to get plugins")?;
-    let (creatures, items, record_read_stats) = get_lists(&plugins, &cfg).with_context(|| "Failed to get leveled lists")?;
+    let (creatures, items, record_read_stats) = get_lists(&plugins, &cfg, &mut log).with_context(|| "Failed to get leveled lists")?;
     let (counts, warning) = process_output(creatures, items, &cfg, &mut log).with_context(|| "Failed to process leveled lists")?;
     show_result(timer, record_read_stats, counts, &cfg, &mut log)?;
     Ok(warning)

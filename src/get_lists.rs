@@ -1,6 +1,9 @@
-use crate::{Cfg, PluginInfo, Progress};
-use anyhow::{Context, Result};
-use std::collections::{hash_map::Entry, HashMap};
+use crate::{msg, Cfg, Log, MsgTone, PluginInfo, Progress};
+use anyhow::{anyhow, Result};
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    io::ErrorKind,
+};
 use tes3::esp::{LeveledCreature, LeveledCreatureFlags, LeveledItem, LeveledItemFlags, ObjectFlags, Plugin, TES3Object};
 
 #[derive(Clone, PartialEq)]
@@ -251,22 +254,42 @@ macro_rules! get_lists {
     };
 }
 
-pub(super) fn get_lists<'a>(plugins: &'a [PluginInfo], cfg: &'a Cfg) -> Result<(Vec<Creature<'a>>, Vec<Item<'a>>, ReadStats)> {
+pub(super) fn get_lists<'a>(
+    plugins: &'a [PluginInfo],
+    cfg: &'a Cfg,
+    log: &mut Log,
+) -> Result<(Vec<Creature<'a>>, Vec<Item<'a>>, ReadStats)> {
     let mut creatures: Vec<Creature> = Vec::new();
     let mut items: Vec<Item> = Vec::new();
     let mut helper = Helper::new(cfg, &plugins[0]);
     let mut stats = ReadStats::default();
     let plugins_len = plugins.len();
     let mut progress = Progress::new(plugins_len, cfg);
+    let mut skipped_plugins: Vec<String> = Vec::new();
     for (plugin_info, count) in plugins.iter().zip(1u64..) {
         if !progress.off {
             progress.tick(count);
         }
         helper.plugin_info = plugin_info;
-        helper
-            .plugin_content
-            .load_path(&plugin_info.path)
-            .with_context(|| format!("Failed to read plugin \"{}\"", &plugin_info.name))?;
+        if let Err(error) = helper.plugin_content.load_path(&plugin_info.path) {
+            if matches!(error.kind(), ErrorKind::InvalidData) {
+                if let Some(tag) = error.to_string().strip_prefix("Unexpected Tag: ") {
+                    if cfg.skip_unexpected_tags
+                        || (!cfg.no_skip_unexpected_tags_default
+                            && cfg.guts.skip_unexpected_tags_default.contains(&tag.to_lowercase()))
+                    {
+                        skipped_plugins.push(format!(
+                            "Plugin \"{}\" will be skipped, because it contains known unexpected record type: {}",
+                            &plugin_info.name, tag
+                        ));
+                        continue;
+                    } else {
+                        return Err(anyhow!("Failed to read plugin \"{}\"\n{}\nUse either --skip \"{0}\" to skip this plugin or --skip-unexpected-tags to skip all similar plugins\nConsider reporting the error to add this tag to the list of unexpected tags to skip by default", &plugin_info.name, error));
+                    }
+                }
+            };
+            return Err(anyhow!("Failed to read plugin \"{}\"\n{}", &plugin_info.name, error));
+        };
         stats.get_records(&helper.plugin_content.objects[0]);
         if !cfg.creatures.no {
             get_lists!(creatures, helper, Creature, LeveledCreature, leveled_creature_flags, LastCreature);
@@ -275,7 +298,10 @@ pub(super) fn get_lists<'a>(plugins: &'a [PluginInfo], cfg: &'a Cfg) -> Result<(
             get_lists!(items, helper, Item, LeveledItem, leveled_item_flags, LastItem);
         }
     }
-    stats.get_plugins(plugins_len);
+    stats.get_plugins(plugins_len - skipped_plugins.len());
     stats.get_speed(progress.finish());
+    if !skipped_plugins.is_empty() {
+        msg(skipped_plugins.join("\n"), MsgTone::Neutral, 0, cfg, log)?;
+    }
     Ok((creatures, items, stats))
 }

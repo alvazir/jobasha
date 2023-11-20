@@ -178,6 +178,30 @@ pub(super) struct Options {
         help = "Do not skip plugins defined by default"
     )]
     pub(super) no_skip_default: bool,
+    /// Skip plugins that contain unexpected record types.
+    ///
+    /// Some new plugins may contain record types not defined in TES3 plugin "specification". You will encounter "Unexpected Tag: ..." error then. Use this option to skip plugins with unexpected tags. Consider reporting newly appeared record types so that they'd be added to the list of unexpected tags to skip by default.
+    ///
+    /// By default program skips plugins that contain "LUAL" records. See --no-skip-unexpected-tags-default.
+    #[arg(
+        help_heading = "Filters",
+        conflicts_with = "settings_write",
+        long,
+        alias = "skip_unexpected_tags",
+        help = "Skip plugins that contain unexpected record types"
+    )]
+    pub(super) skip_unexpected_tags: bool,
+    /// Do not skip plugins that contain known unexpected record types.
+    ///
+    /// By default program skips plugins that contain "LUAL" records. See --skip-unexpected-tags for details.
+    #[arg(
+        help_heading = "Filters",
+        conflicts_with = "settings_write",
+        long,
+        alias = "no_skip_unexpected_tags_default",
+        help = "Do not skip plugins that contain known unexpected record types"
+    )]
+    pub(super) no_skip_unexpected_tags_default: bool,
     /// Do not process creature leveled lists.
     ///
     /// This flag conflicts with --no-items.

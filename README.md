@@ -48,12 +48,14 @@ Jobasha will perfectly organize all your lists in his library. It is a [command 
     -V, --version               Print version
   
   Filters:
-    -a, --all-lists         Place all leveled lists into the output plugin
-    -k, --skip-last <0>     Do not process last <N> plugins
-    -K, --skip <PLUGIN(S)>  Do not process these plugins
-        --no-skip-default   Do not skip plugins defined by default
-        --no-creatures      Do not process creature leveled lists
-        --no-items          Do not process item leveled lists
+    -a, --all-lists                        Place all leveled lists into the output plugin
+    -k, --skip-last <0>                    Do not process last <N> plugins
+    -K, --skip <PLUGIN(S)>                 Do not process these plugins
+        --no-skip-default                  Do not skip plugins defined by default
+        --skip-unexpected-tags             Skip plugins that contain unexpected record types
+        --no-skip-unexpected-tags-default  Do not skip plugins that contain known unexpected record types
+        --no-creatures                     Do not process creature leveled lists
+        --no-items                         Do not process item leveled lists
   
   Subrecord deletion:
     -D, --no-delete                  Do not delete subrecords from leveled lists
