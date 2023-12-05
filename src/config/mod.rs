@@ -12,7 +12,7 @@ use settings::{get_settings, Settings};
 use util::{
     append_default_to_skip, backup_settings_file, check_settings_version, check_verboseness, get_color, get_delev_to,
     get_exe_name_and_dir, get_kind_delev_to, get_log_file, get_output_file, get_progress_frequency, get_settings_file,
-    prepare_plugin_extensions_to_ignore,
+    prepare_delev_skip_patterns, prepare_plugin_extensions_to_ignore,
 };
 
 pub(crate) struct Cfg {
@@ -22,6 +22,7 @@ pub(crate) struct Cfg {
     pub(crate) log: Option<PathBuf>,
     pub(crate) no_log: bool,
     pub(crate) settings_file: SettingsFile,
+    pub(crate) no_backup: bool,
     pub(crate) ignore_errors: bool,
     pub(crate) all_lists: bool,
     pub(crate) skip_last: usize,
@@ -38,6 +39,13 @@ pub(crate) struct Cfg {
     pub(crate) delev: bool,
     pub(crate) delev_distinct: bool,
     pub(crate) delev_output: OutputFile,
+    pub(crate) delev_skip_list: DelevSkipPatterns,
+    pub(crate) delev_no_skip_list: DelevSkipPatterns,
+    pub(crate) delev_skip_subrecord: DelevSkipPatterns,
+    pub(crate) delev_no_skip_subrecord: DelevSkipPatterns,
+    pub(crate) no_compare: bool,
+    pub(crate) compare_with: String,
+    pub(crate) compare_delev_with: String,
     pub(crate) verbose: u8,
     pub(crate) quiet: bool,
     pub(crate) progress: bool,
@@ -56,11 +64,19 @@ pub(crate) struct SettingsFile {
     pub(crate) backup_overwritten: bool,
 }
 
+pub(crate) struct DelevSkipPatterns {
+    pub(crate) is_empty: bool,
+    pub(crate) exact: Vec<String>,
+    pub(crate) prefix: Vec<String>,
+    pub(crate) infix: Vec<String>,
+    pub(crate) suffix: Vec<String>,
+}
+
 pub(crate) struct Kind {
-    pub(crate) no: bool,
+    pub(crate) skip: bool,
     pub(crate) threshold: f64,
     pub(crate) log_t: String,
-    pub(crate) no_delev: bool,
+    pub(crate) skip_delev: bool,
     pub(crate) delev_to: u16,
 }
 
@@ -75,6 +91,7 @@ pub(crate) struct OutputFile {
     pub(crate) name_lowercased_starts_with: String,
     pub(crate) path: PathBuf,
     pub(crate) dir_path: PathBuf,
+    pub(crate) backup_path: PathBuf,
 }
 
 pub(crate) struct Guts {
@@ -113,6 +130,10 @@ pub(crate) struct Guts {
     pub(crate) verboseness_details_threshold_skipped: u8,
     pub(crate) verboseness_details_threshold_warnings: u8,
     pub(crate) verboseness_details_deleveled_subrecords: u8,
+    pub(crate) verboseness_details_compare_plugins: u8,
+    pub(crate) compare_tab_l1: String,
+    pub(crate) compare_tab_l2: String,
+    pub(crate) compare_tab_l3: String,
 }
 
 impl Cfg {
@@ -173,6 +194,7 @@ impl Cfg {
             no_log,
             log: get_log_file(no_log, opt_or_set_some!(log), exe, dir)?,
             settings_file,
+            no_backup: opt_or_set_bool!(no_backup),
             ignore_errors: opt_or_set_bool!(ignore_errors),
             all_lists: opt_or_set_bool!(all_lists),
             skip_last: opt_or_set_some!(skip_last),
@@ -184,17 +206,17 @@ impl Cfg {
             skip_unexpected_tags: opt_or_set_bool!(skip_unexpected_tags),
             no_skip_unexpected_tags_default: opt_or_set_bool!(no_skip_unexpected_tags_default),
             creatures: Kind {
-                no: opt_or_set_bool!(no_creatures),
+                skip: opt_or_set_bool!(skip_creatures),
                 threshold: opt_or_set_threshold!(threshold_creatures, "threshold_creatures"),
                 log_t: set.guts.log_t_creature,
-                no_delev: opt_or_set_bool!(delev_no_creatures),
+                skip_delev: opt_or_set_bool!(delev_skip_creatures),
                 delev_to: get_kind_delev_to(delev_to, opt_or_set_some!(delev_creatures_to)),
             },
             items: Kind {
-                no: opt_or_set_bool!(no_items),
+                skip: opt_or_set_bool!(skip_items),
                 threshold: opt_or_set_threshold!(threshold_items, "threshold_items"),
                 log_t: set.guts.log_t_item,
-                no_delev: opt_or_set_bool!(delev_no_items),
+                skip_delev: opt_or_set_bool!(delev_skip_items),
                 delev_to: get_kind_delev_to(delev_to, opt_or_set_some!(delev_items_to)),
             },
             no_delete: opt_or_set_bool!(no_delete),
@@ -204,6 +226,13 @@ impl Cfg {
             no_threshold_warnings: opt_or_set_bool!(no_threshold_warnings),
             delev: opt_or_set_bool!(delev),
             delev_distinct: opt_or_set_bool!(delev_distinct),
+            delev_skip_list: prepare_delev_skip_patterns(opt_or_set_vec_lowercase!(delev_skip_list)),
+            delev_no_skip_list: prepare_delev_skip_patterns(opt_or_set_vec_lowercase!(delev_no_skip_list)),
+            delev_skip_subrecord: prepare_delev_skip_patterns(opt_or_set_vec_lowercase!(delev_skip_subrecord)),
+            delev_no_skip_subrecord: prepare_delev_skip_patterns(opt_or_set_vec_lowercase!(delev_no_skip_subrecord)),
+            no_compare: opt_or_set_bool!(no_compare),
+            compare_with: opt_or_set_some!(compare_with),
+            compare_delev_with: opt_or_set_some!(compare_delev_with),
             verbose: if opt.verbose == 0 {
                 get_verbose!(set.options.verbose)
             } else {
@@ -250,6 +279,10 @@ impl Cfg {
                 verboseness_details_threshold_skipped: get_verbose!(set.guts.verboseness_details_threshold_skipped),
                 verboseness_details_threshold_warnings: get_verbose!(set.guts.verboseness_details_threshold_warnings),
                 verboseness_details_deleveled_subrecords: get_verbose!(set.guts.verboseness_details_deleveled_subrecords),
+                verboseness_details_compare_plugins: get_verbose!(set.guts.verboseness_details_compare_plugins),
+                compare_tab_l1: set.guts.compare_tab_l1,
+                compare_tab_l2: set.guts.compare_tab_l2,
+                compare_tab_l3: set.guts.compare_tab_l3,
             },
         })
     }
@@ -263,7 +296,7 @@ pub(super) fn get_self_config() -> Result<Cfg> {
     if options.settings_write {
         let toml = template::<Settings>(FormatOptions::default());
         create_dir_early(&settings_file.path, "settings")?;
-        backup_settings_file(&mut settings_file, &settings.guts.settings_backup_suffix)?;
+        backup_settings_file(&mut settings_file, &settings.guts.settings_backup_suffix, options.no_backup)?;
         write(&settings_file.path, toml)
             .with_context(|| format!("Failed to write default program settings into \"{}\"", settings_file.path.display()))?;
     }

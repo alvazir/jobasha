@@ -31,6 +31,8 @@ pub(super) struct Options {
     #[config(default = false)]
     pub(super) no_log: bool,
     #[config(default = false)]
+    pub(super) no_backup: bool,
+    #[config(default = false)]
     pub(super) ignore_errors: bool,
     ///
     /// [Filters]
@@ -48,9 +50,9 @@ pub(super) struct Options {
     #[config(default = false)]
     pub(super) no_skip_unexpected_tags_default: bool,
     #[config(default = false)]
-    pub(super) no_creatures: bool,
+    pub(super) skip_creatures: bool,
     #[config(default = false)]
-    pub(super) no_items: bool,
+    pub(super) skip_items: bool,
     ///
     /// [Subrecord deletion]
     ///
@@ -81,14 +83,34 @@ pub(super) struct Options {
     #[config(default = 0)]
     pub(super) delev_items_to: u16,
     #[config(default = false)]
-    pub(super) delev_no_creatures: bool,
-    #[config(default = false)]
-    pub(super) delev_no_items: bool,
-    #[config(default = false)]
     pub(super) delev_distinct: bool,
     /// By default the value is empty so that "guts.delev_output_infix_default" is added to the output plugin name.
     #[config(default = "")]
     pub(super) delev_output: String,
+    ///
+    /// [Delev filters]
+    ///
+    #[config(default = false)]
+    pub(super) delev_skip_creatures: bool,
+    #[config(default = false)]
+    pub(super) delev_skip_items: bool,
+    #[config(default = [])]
+    pub(super) delev_skip_list: Vec<String>,
+    #[config(default = [])]
+    pub(super) delev_no_skip_list: Vec<String>,
+    #[config(default = [])]
+    pub(super) delev_skip_subrecord: Vec<String>,
+    #[config(default = [])]
+    pub(super) delev_no_skip_subrecord: Vec<String>,
+    ///
+    /// [Compare]
+    ///
+    #[config(default = false)]
+    pub(super) no_compare: bool,
+    #[config(default = "")]
+    pub(super) compare_with: String,
+    #[config(default = "")]
+    pub(super) compare_delev_with: String,
     ///
     /// [Display output]
     ///
@@ -203,8 +225,10 @@ pub(super) struct Guts {
     ///
     #[config(default = ".backup")]
     pub(super) settings_backup_suffix: String,
-    #[config(default = ".previous")]
+    #[config(default = ".backup")]
     pub(super) log_backup_suffix: String,
+    #[config(default = ".backup")]
+    pub(super) output_backup_suffix: String,
     ///
     /// [Progress]
     /// Configuration of progress/progress bar. Do not set frequency higher than 15 - it slows everything due to locks etc.
@@ -235,7 +259,7 @@ pub(super) struct Guts {
     pub(super) suffix_add_ignore_errors_suggestion: String,
     #[config(default = 128)]
     pub(super) details_line_approximate_length: usize,
-    #[config(default = 1)]
+    #[config(default = 2)]
     pub(super) verboseness_details_deleted_subrecords: u8,
     #[config(default = 2)]
     pub(super) verboseness_details_untouched_lists: u8,
@@ -247,6 +271,14 @@ pub(super) struct Guts {
     pub(super) verboseness_details_threshold_warnings: u8,
     #[config(default = 3)]
     pub(super) verboseness_details_deleveled_subrecords: u8,
+    #[config(default = 1)]
+    pub(super) verboseness_details_compare_plugins: u8,
+    #[config(default = "  ")]
+    pub(super) compare_tab_l1: String,
+    #[config(default = "    ")]
+    pub(super) compare_tab_l2: String,
+    #[config(default = "      ")]
+    pub(super) compare_tab_l3: String,
     /// These 2 are used in log/output in a leveled list type column. Only first letter is used.
     #[config(default = "C")]
     pub(super) log_t_creature: String,

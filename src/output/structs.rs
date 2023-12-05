@@ -1,6 +1,6 @@
-use crate::{ListCounts, PluginName, ResponsiblePlugins, Subrecord};
+use crate::{ComparePlugins, ListCounts, PluginName, ResponsiblePlugins, Subrecord};
 use std::collections::HashMap;
-use tes3::esp::{Plugin, TES3Object};
+use tes3::esp::{LeveledCreature, LeveledItem, Plugin, TES3Object};
 
 pub(crate) struct Messages<'a> {
     pub(crate) threshold_resolved: ThresholdMessages<'a>,
@@ -34,16 +34,18 @@ pub(crate) struct RawOutputPlugin<'a> {
 pub(crate) struct Helper<'a> {
     pub(crate) merge: RawOutputPlugin<'a>,
     pub(crate) delev: RawOutputPlugin<'a>,
+    pub(crate) compare: ComparePlugins,
     pub(crate) counts: ListCounts,
     pub(crate) messages: Messages<'a>,
     pub(crate) warning: bool,
 }
 
 impl<'a> Helper<'a> {
-    pub(crate) fn new() -> Helper<'a> {
+    pub(crate) fn new(plugins_to_compare: ComparePlugins) -> Helper<'a> {
         Helper {
             merge: RawOutputPlugin::default(),
             delev: RawOutputPlugin::default(),
+            compare: plugins_to_compare,
             counts: ListCounts::default(),
             messages: Messages::new(),
             warning: false,
@@ -137,4 +139,14 @@ pub(crate) struct DeleveledSubrecords<'a> {
     pub(crate) id: String,
     pub(crate) initial_plugin: PluginName<'a>,
     pub(crate) subrecords: Vec<(Subrecord, NewLevel)>,
+}
+
+pub(super) type Levc<'a> = HashMap<String, (usize, &'a LeveledCreature)>;
+pub(super) type Levi<'a> = HashMap<String, (usize, &'a LeveledItem)>;
+
+#[derive(Default)]
+pub(super) struct ListDiffStats {
+    pub(super) added: usize,
+    pub(super) removed: usize,
+    pub(super) changed: usize,
 }

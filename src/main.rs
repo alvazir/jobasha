@@ -25,14 +25,14 @@ mod get_plugins;
 mod output;
 mod show_result;
 mod util;
-use config::{get_self_config, Cfg, OutputFile, PluginKind};
+use config::{get_self_config, Cfg, DelevSkipPatterns, OutputFile, PluginKind};
 use get_lists::{get_lists, Creature, Item, LastCreature, LastItem, PluginName, ReadStats, ResponsiblePlugins, Subrecord};
-use get_plugins::{get_plugins, PluginInfo};
+use get_plugins::{get_plugins, get_plugins_to_compare, PluginInfo};
 use output::process_output;
 use show_result::show_result;
 use util::{
     create_dir_early, err_or_ignore, err_or_ignore_thread_safe, get_plugin_size, msg, plural, read_lines, show_log_path,
-    show_settings_version_message, show_settings_written, ListCounts, Log, MsgTone, Progress,
+    show_settings_version_message, show_settings_written, ComparePlugin, ComparePlugins, ListCounts, Log, MsgTone, Progress,
 };
 
 fn main() {
@@ -57,9 +57,11 @@ fn run() -> Result<bool> {
         return Ok(false);
     }
     show_settings_version_message(&cfg, &mut log)?;
+    let plugins_to_compare = get_plugins_to_compare(&cfg, &mut log).with_context(|| "Failed to get plugins for comparison")?;
     let plugins = get_plugins(&cfg, &mut log).with_context(|| "Failed to get plugins")?;
     let (creatures, items, record_read_stats) = get_lists(&plugins, &cfg, &mut log).with_context(|| "Failed to get leveled lists")?;
-    let (counts, warning) = process_output(creatures, items, &cfg, &mut log).with_context(|| "Failed to process leveled lists")?;
+    let (counts, warning) =
+        process_output(creatures, items, plugins_to_compare, &cfg, &mut log).with_context(|| "Failed to process leveled lists")?;
     show_result(timer, record_read_stats, counts, &cfg, &mut log)?;
     Ok(warning)
 }

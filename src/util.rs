@@ -1,12 +1,13 @@
 use crate::Cfg;
 use anyhow::{anyhow, Context, Result};
-use fs_err::{copy, create_dir_all, File};
+use fs_err::{create_dir_all, rename, File};
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use std::{
     io::{self, BufRead, BufWriter, Write},
     path::{Path, PathBuf},
     time::Instant,
 };
+use tes3::esp::Plugin;
 
 #[derive(Default)]
 pub(crate) struct ListCounts {
@@ -38,6 +39,25 @@ pub(crate) struct ListCountsDelev {
     pub(crate) placed: usize,
     pub(crate) master: usize,
     pub(crate) deleveled_subrecord: usize,
+}
+
+#[derive(Default)]
+pub(super) struct ComparePlugin {
+    pub(super) plugin: Plugin,
+    pub(super) loaded: bool,
+    pub(super) compared: bool,
+    pub(super) equal: bool,
+    pub(super) not_found: bool,
+    pub(super) read_error: bool,
+    pub(super) load_error: bool,
+}
+
+#[derive(Default)]
+pub(super) struct ComparePlugins {
+    pub(super) previous: ComparePlugin,
+    pub(super) compare_with: ComparePlugin,
+    pub(super) delev_previous: ComparePlugin,
+    pub(super) delev_compare_with: ComparePlugin,
 }
 
 pub(crate) enum MsgTone {
@@ -192,7 +212,7 @@ impl Log {
                 Some(log) => log,
             };
             create_dir_early(log, "log")?;
-            let log_backup_message = backup_log_file(log, &cfg.guts.log_backup_suffix);
+            let log_backup_message = backup_log_file(log, &cfg.guts.log_backup_suffix, cfg.no_backup);
             let buffer = Some(BufWriter::new(
                 File::create(log).with_context(|| format!("Failed to create/open log file \"{}\"", log.display()))?,
             ));
@@ -224,13 +244,7 @@ pub(super) fn show_log_path(cfg: &Cfg, log: &mut Log) -> Result<()> {
             None => return Err(anyhow!("Failed to show log path because it's empty")),
             Some(log_path) => log_path,
         };
-        msg(
-            format!("Log is being written into \"{}\"", log_path.display()),
-            MsgTone::Good,
-            0,
-            cfg,
-            log,
-        )
+        msg(format!("Log is written to \"{}\"", log_path.display()), MsgTone::Good, 0, cfg, log)
     }
 }
 
@@ -238,7 +252,7 @@ pub(super) fn show_settings_written(cfg: &Cfg, log: &mut Log) -> Result<()> {
     let mut text = String::with_capacity(128);
     if cfg.settings_file.backup_written {
         text.push_str(&format!(
-            "Settings file backup was written to \"{}\"{}",
+            "Previous settings file was renamed to \"{}\"{}",
             cfg.settings_file.backup_path.display(),
             if cfg.settings_file.backup_overwritten {
                 ", previous backup was overwritten"
@@ -314,12 +328,16 @@ pub(super) fn show_settings_version_message(cfg: &Cfg, log: &mut Log) -> Result<
     }
 }
 
-fn backup_log_file(log_file: &PathBuf, backup_suffix: &str) -> String {
-    let mut backup_path = log_file.clone().into_os_string();
-    backup_path.push(backup_suffix);
-    let backup_file: PathBuf = backup_path.into();
-    match copy(log_file, &backup_file) {
-        Ok(_) => format!("Previous log file was saved to \"{}\"", backup_file.display()),
-        Err(_) => String::new(),
+fn backup_log_file(log_file: &PathBuf, backup_suffix: &str, no_backup: bool) -> String {
+    if !no_backup {
+        let mut backup_path = log_file.clone().into_os_string();
+        backup_path.push(backup_suffix);
+        let backup_file: PathBuf = backup_path.into();
+        match rename(log_file, &backup_file) {
+            Ok(_) => format!("Previous log file was renamed to \"{}\"", backup_file.display()),
+            Err(_) => String::new(),
+        }
+    } else {
+        String::new()
     }
 }

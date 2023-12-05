@@ -10,14 +10,14 @@ use clap::{builder::StyledStr, Arg, CommandFactory, Parser};
   - Display/log output looks better with monospaced font.
   - Don't clean the output plugin. Cleaning may rarely lead to removal of some leveled lists that should be there."
 )]
-/// Jobasha - TES3 leveled list merging and deleveling tool
+/// Jobasha - TES3 leveled list tool
 ///
 /// Author: alvazir
 /// License: GNU GPLv3
 /// GitHub: https://github.com/alvazir/jobasha
 /// Nexus Mods: https://www.nexusmods.com/morrowind/mods/52707
 pub(super) struct Options {
-    /// Path to the game configuration file, e.g.: "C:\Users\Username\Documents\My Games\OpenMW\openmw.cfg"(absolute), "../Morrowind.ini"(relative). May be used to provide alternative game configuration file or in case the game configuration file was not found automatically.
+    /// Path to the game configuration file, e.g.: "C:\Users\Username\Documents\My Games\OpenMW\openmw.cfg"(absolute), "../Morrowind.ini"(relative). May be used to provide alternative game configuration file or in case the game configuration file is not found automatically.
     ///
     /// Default value: ""(automatically search for the game configuration file).
     #[arg(
@@ -72,7 +72,7 @@ pub(super) struct Options {
     pub(super) dry_run: bool,
     /// Name of the log file. May be provided as a path. Non-existent directories will be created.
     ///
-    /// Log contains display output of the program as if it was run with maximum verboseness. It is enabled by default, use --no-log to disable. Previous log will be saved with ".previous" extension.
+    /// Log contains display output of the program as if it was run with maximum verboseness. It is enabled by default, use --no-log to disable. Previous log will be saved with ".backup" extension.
     ///
     /// Default value: "<program_name>.log"(file will be created in program directory).
     #[arg(
@@ -103,9 +103,14 @@ pub(super) struct Options {
     ///
     /// File will be created in program directory with name "<program_name>.toml" by default. Backup of old settings file will be saved with ".backup" extension. Use --settings to provide another path. Keep in mind that non-default settings file path should be explicitly provided every time you want to use it.
     ///
-    /// This flag conflicts with everything except --settings, --no-color, --log, --no-log.
+    /// This flag conflicts with everything except --settings, --log, --no-log, --color, --no-backup.
     #[arg(long, aliases = ["settings_write", "write-settings", "write_settings"], help = "Write default program settings file and exit")]
     pub(super) settings_write: bool,
+    /// Do not make backups.
+    ///
+    /// By default output plugins, log file and settings file are backed up before rewriting.
+    #[arg(long, aliases = ["no_backup", "backup-no", "backup_no"], help = "Do not make backups")]
+    pub(super) no_backup: bool,
     /// Ignore non-critical errors, e.g. missing plugin. May be useful, though it's better to fix underlying problems.
     #[arg(
         conflicts_with = "settings_write",
@@ -204,26 +209,26 @@ pub(super) struct Options {
     pub(super) no_skip_unexpected_tags_default: bool,
     /// Do not process creature leveled lists.
     ///
-    /// This flag conflicts with --no-items.
+    /// This flag conflicts with --skip-items.
     #[arg(
         help_heading = "Filters",
-        conflicts_with_all = ["settings_write", "no_items"],
+        conflicts_with_all = ["settings_write", "skip_items"],
         long,
-        aliases = ["no_creatures", "creatures-no", "creatures_no", "no-creature", "no_creature", "creature-no", "creature_no"],
+        aliases = ["skip_creatures", "creatures-skip", "creatures_skip", "skip-creature", "skip_creature", "creature-skip", "creature_skip"],
         help = "Do not process creature leveled lists"
     )]
-    pub(super) no_creatures: bool,
+    pub(super) skip_creatures: bool,
     /// Do not process item leveled lists.
     ///
-    /// This flag conflicts with --no-creatures.
+    /// This flag conflicts with --skip-creatures.
     #[arg(
         help_heading = "Filters",
-        conflicts_with_all = ["settings_write", "no_creatures"],
+        conflicts_with_all = ["settings_write", "skip_creatures"],
         long,
-        aliases = ["no_items", "items-no", "items_no", "no-item", "no_item", "item-no", "item_no"],
+        aliases = ["skip_items", "items-skip", "items_skip", "skip-item", "skip_item", "item-skip", "item_skip"],
         help = "Do not process item leveled lists"
     )]
-    pub(super) no_items: bool,
+    pub(super) skip_items: bool,
     /// Do not delete subrecords from leveled lists.
     ///
     /// This flag conflicts with --extended-delete.
@@ -299,11 +304,11 @@ pub(super) struct Options {
     ///
     /// Default value: 67(%).
     ///
-    /// This flag requires --extended-delete. Conflicts with --no-creatures.
+    /// This flag requires --extended-delete. Conflicts with --skip-creatures.
     #[arg(
         help_heading = "Subrecord deletion",
         requires = "extended_delete",
-        conflicts_with_all = ["settings_write", "no_delete", "no_creatures"],
+        conflicts_with_all = ["settings_write", "no_delete", "skip_creatures"],
         long,
         aliases = ["threshold_creatures", "creatures-threshold", "creatures_threshold", "threshold-creature", "threshold_creature", "creature-threshold", "creature_threshold"],
         help = "Threshold for % of deleted/initial creatures per list",
@@ -315,11 +320,11 @@ pub(super) struct Options {
     ///
     /// Default value: 49(%).
     ///
-    /// This flag requires --extended-delete. Conflicts with --no-items.
+    /// This flag requires --extended-delete. Conflicts with --skip-items.
     #[arg(
         help_heading = "Subrecord deletion",
         requires = "extended_delete",
-        conflicts_with_all = ["settings_write", "no_delete", "no_items"],
+        conflicts_with_all = ["settings_write", "no_delete", "skip_items"],
         long,
         aliases = ["threshold_items", "items-threshold", "items_threshold", "threshold-item", "threshold_item", "item-threshold", "item_threshold"],
         help = "Threshold for % of deleted/initial items per list",
@@ -377,11 +382,11 @@ pub(super) struct Options {
     pub(super) delev_to: Option<u16>,
     /// Set level to delevel creature subrecords to.
     ///
-    /// This flag requires --delev. Conflicts with --no-creatures, --delev-no-creatures.
+    /// This flag requires --delev. Conflicts with --skip-creatures, --delev-skip-creatures.
     #[arg(
         help_heading = "Delev",
         requires = "delev",
-        conflicts_with_all = ["settings_write", "no_creatures", "delev_no_creatures"],
+        conflicts_with_all = ["settings_write", "skip_creatures", "delev_skip_creatures"],
         long,
         aliases = ["delev_creatures_to", "delev-creature-to", "delev_creature_to", "delevel-creatures-to", "delevel-creature-to", "delevel_creatures_to", "delevele_creature_to"],
         help = "Set level to delevel creature subrecords to",
@@ -391,11 +396,11 @@ pub(super) struct Options {
     pub(super) delev_creatures_to: Option<u16>,
     /// Set level to delevel item subrecords to.
     ///
-    /// This flag requires --delev. Conflicts with --no-items, --delev-no-items.
+    /// This flag requires --delev. Conflicts with --skip-items, --delev-skip-items.
     #[arg(
         help_heading = "Delev",
         requires = "delev",
-        conflicts_with_all = ["settings_write", "no_items", "delev_no_items"],
+        conflicts_with_all = ["settings_write", "skip_items", "delev_skip_items"],
         long,
         aliases = ["delev_items_to", "delev-item-to", "delev_item_to", "delevel-items-to", "delevel-item-to", "delevel_items_to", "delevele_item_to"],
         help = "Set level to delevel item subrecords to",
@@ -403,31 +408,6 @@ pub(super) struct Options {
         value_parser = clap::value_parser!(u16).range(1..)
     )]
     pub(super) delev_items_to: Option<u16>,
-    /// Do not delevel creature subrecords.
-    ///
-    /// This flag requires --delev. Conflicts with --delev-no-items.
-    #[arg(
-        help_heading = "Delev",
-        requires = "delev",
-        conflicts_with_all = ["settings_write", "delev_no_items"],
-        long,
-        aliases = ["delev_no_creatures", "delev-creatures-no", "delev_creatures_no", "delev-no-creature", "delev_no_creature", "delev-creature-no", "delev_creature_no", "delevel-no-creatures", "delevel_no_creatures", "delevel-creatures-no", "delevel_creatures_no", "delevel-no-creature", "delevel_no_creature", "delevel-creature-no", "delevel_creature_no"],
-        help = "Do not delevel creature subrecords"
-    )]
-    pub(super) delev_no_creatures: bool,
-    /// Do not delevel item subrecords.
-    ///
-    /// This flag requires --delev. Conflicts with --delev-no-creatures.
-    #[arg(
-        help_heading = "Delev",
-        requires = "delev",
-        conflicts_with_all = ["settings_write", "delev_no_creatures"],
-        short = 'I',
-        long,
-        aliases = ["delev_no_items", "delev-items-no", "delev_items_no", "delev-no-item", "delev_no_item", "delev-item-no", "delev_item_no", "delevel-no-items", "delevel_no_items", "delevel-items-no", "delevel_items_no", "delevel-no-item", "delevel_no_item", "delevel-item-no", "delevel_item_no"],
-        help = "Do not delevel item subrecords"
-    )]
-    pub(super) delev_no_items: bool,
     /// Place deleveled lists into the additional output plugin.
     ///
     /// Deleveled lists are placed into the output plugin by default. Use this option to separate merged and deleveled lists. By default additional plugin has the same name as the output plugin with added infix " - Delev", e.g. "MergedLeveledLists - Delev.esp". Use --delev-output to set custom name.
@@ -460,6 +440,172 @@ pub(super) struct Options {
         help = "Name of the distinct delev output plugin"
     )]
     pub(super) delev_output: Option<String>,
+    /// Do not delevel creature subrecords.
+    ///
+    /// This flag requires --delev. Conflicts with --delev-skip-items.
+    #[arg(
+        help_heading = "Delev filters",
+        requires = "delev",
+        conflicts_with_all = ["settings_write", "delev_skip_items"],
+        long,
+        aliases = ["delev_skip_creatures", "delev-creatures-skip", "delev_creatures_skip", "delev-skip-creature", "delev_skip_creature", "delev-creature-skip", "delev_creature_skip", "delevel-skip-creatures", "delevel_skip_creatures", "delevel-creatures-skip", "delevel_creatures_skip", "delevel-skip-creature", "delevel_skip_creature", "delevel-creature-skip", "delevel_creature_skip"],
+        help = "Do not delevel creature subrecords"
+    )]
+    pub(super) delev_skip_creatures: bool,
+    /// Do not delevel item subrecords.
+    ///
+    /// This flag requires --delev. Conflicts with --delev-skip-creatures.
+    #[arg(
+        help_heading = "Delev filters",
+        requires = "delev",
+        conflicts_with_all = ["settings_write", "delev_skip_creatures"],
+        short = 'I',
+        long,
+        aliases = ["delev_skip_items", "delev-items-skip", "delev_items_skip", "delev-skip-item", "delev_skip_item", "delev-item-skip", "delev_item_skip", "delevel-skip-items", "delevel_skip_items", "delevel-items-skip", "delevel_items_skip", "delevel-skip-item", "delevel_skip_item", "delevel-item-skip", "delevel_item_skip"],
+        help = "Do not delevel item subrecords"
+    )]
+    pub(super) delev_skip_items: bool,
+    /// Do not delevel these lists.
+    ///
+    /// Use this option to skip leveled lists from deleveling. Additionaly use --delev-no-skip-list to further refine your rules with lists you want to delevel even if they fit skip patterns.
+    ///
+    /// Following examples are illustrated with Bloodmoon's wolfpack and werewolf leveled lists:
+    ///     - bm_ex_wolfpack, bm_ex_wolfpack_20, bm_ex_wolfpack_40, bm_ex_wolfpack_60
+    ///     - bm_werewolf_wilderness01 - bm_werewolf_wilderness09
+    ///
+    /// There are 4 pattern types, they are processed in the following order:
+    ///
+    ///   "exact"
+    ///     - Default type. Leveled list matches if it's name is exactly the same as the pattern.
+    ///     - Example: --delev-skip-list "bm_ex_wolfpack" would only skip that exact list.
+    ///
+    ///   "prefix"
+    ///     - Defined by prepending with "prefix:". Leveled list matches if it's name starts with the pattern.
+    ///     - Example: --delev-skip-list "prefix:bm_ex_" would skip all bm_ex_wolfpack* leveled lists.
+    ///
+    ///   "suffix"
+    ///     - Defined by prepending with "suffix:". Leveled list matches if it's name ends with the pattern.
+    ///     - Example: --delev-skip-list "suffix:_40" would only skip bm_ex_wolfpack_40.
+    ///
+    ///   "infix"
+    ///     - Defined by prepending with "infix:". Leveled list matches if it's name contains the pattern.
+    ///     - Example: --delev-skip-list "infix:wolf" would skip all those lists.
+    ///
+    /// May take either one or multiple comma-separated plugin names, e.g.: "bm_ex_wolfpack"(one), prefix:bm_ex_,suffix:_40(many). Pay attention that there is no space after comma. Use double-quotes around list names with spaces. Case-insensitive. May be used multiple times instead of providing comma-separated list, e.g.: --delev-skip-list prefix:bm_ex_ --delev-skip-list suffix:-40.
+    ///
+    /// This flag requires --delev.
+    #[arg(
+        help_heading = "Delev filters",
+        requires = "delev",
+        conflicts_with = "settings_write",
+        long,
+        aliases = ["delev_skip_list", "delev-list-skip", "delev_list_skip", "delev-skip-lists", "delev_skip_lists", "delev-lists-skip", "delev_lists_skip", "delevel-skip-list", "delevel_skip_list", "delevel-list-skip", "delevel_list_skip", "delevel-skip-lists", "delevel_skip_lists", "delevel-lists-skip", "delevel_lists_skip"],
+        help = "Do not delevel these lists",
+        value_name = "LIST(S)",
+        use_value_delimiter = true,
+        value_delimiter = ',',
+        verbatim_doc_comment
+    )]
+    pub(super) delev_skip_list: Option<Vec<String>>,
+    /// Delevel these lists even if they match --delev-skip-list.
+    ///
+    /// The opposite of --delev-skip-list. Patterns work the same.
+    ///
+    /// Following examples are illustrated with Bloodmoon's wolfpack and werewolf leveled lists:
+    ///     - bm_ex_wolfpack, bm_ex_wolfpack_20, bm_ex_wolfpack_40, bm_ex_wolfpack_60
+    ///     - bm_werewolf_wilderness01 - bm_werewolf_wilderness09
+    ///
+    /// The best way to describe is to continue examples started in --delev-skip-list:
+    ///
+    ///  --delev-skip-list "prefix:bm_" --delev-no-skip-list "prefix:bm_ex_" would skip werewolf lists
+    ///
+    ///  --delev-skip-list "infix:wolf" --delev-no-skip-list "suffix:09" would skip everything except bm_werewolf_wilderness09
+    ///
+    /// This flag requires --delev-skip-list.
+    #[arg(
+        help_heading = "Delev filters",
+        requires = "delev_skip_list",
+        conflicts_with = "settings_write",
+        long,
+        aliases = ["delev_no_skip_list", "delev-list-no-skip", "delev_list_no_skip", "delev-no-skip-lists", "delev_no_skip_lists", "delev-lists-no-skip", "delev_lists_no_skip", "delevel-no-skip-list", "delevel_no_skip_list", "delevel-list-no-skip", "delevel_list_no_skip", "delevel-no-skip-lists", "delevel_no_skip_lists", "delevel-lists-no-skip", "delevel_lists_no_skip", "delev-skip-no-list", "delev_skip_no_list", "delev-list-skip-no", "delev_list_skip_no", "delev-skip-no-lists", "delev_skip_no_lists", "delev-lists-skip-no", "delev_lists_skip_no", "delevel-skip-no-list", "delevel_skip_no_list", "delevel-list-skip-no", "delevel_list_skip_no", "delevel-skip-no-lists", "delevel_skip_no_lists", "delevel-lists-skip-no", "delevel_lists_skip_no"],
+        help = "Delevel these lists even if they match --delev-skip-list",
+        value_name = "LIST(S)",
+        use_value_delimiter = true,
+        value_delimiter = ',',
+        verbatim_doc_comment
+    )]
+    pub(super) delev_no_skip_list: Option<Vec<String>>,
+    /// Do not delevel these subrecords. Works exactly as --delev-skip-list, but filters out subrecords instead of lists.
+    ///
+    /// This flag requires --delev.
+    #[arg(
+        help_heading = "Delev filters",
+        requires = "delev",
+        conflicts_with = "settings_write",
+        long,
+        aliases = ["delev_skip_subrecord", "delev-subrecord-skip", "delev_subrecord_skip", "delev-skip-subrecords", "delev_skip_subrecords", "delev-subrecords-skip", "delev_subrecords_skip", "delevel-skip-subrecord", "delevel_skip_subrecord", "delevel-subrecord-skip", "delevel_subrecord_skip", "delevel-skip-subrecords", "delevel_skip_subrecords", "delevel-subrecords-skip", "delevel_subrecords_skip"],
+        help = "Do not delevel these subrecords",
+        value_name = "SUBRECORD(S)",
+        use_value_delimiter = true,
+        value_delimiter = ',',
+        verbatim_doc_comment
+    )]
+    pub(super) delev_skip_subrecord: Option<Vec<String>>,
+    /// Delevel these lists even if they match --delev-skip-subrecord. Works exactly as --delev-no-skip-list, but filters out subrecords instead of lists.
+    ///
+    /// This flag requires --delev-skip-subrecord.
+    #[arg(
+        help_heading = "Delev filters",
+        requires = "delev_skip_subrecord",
+        conflicts_with = "settings_write",
+        long,
+        aliases = ["delev_no_skip_subrecord", "delev-subrecord-no-skip", "delev_subrecord_no_skip", "delev-no-skip-subrecords", "delev_no_skip_subrecords", "delev-subrecords-no-skip", "delev_subrecords_no_skip", "delevel-no-skip-subrecord", "delevel_no_skip_subrecord", "delevel-subrecord-no-skip", "delevel_subrecord_no_skip", "delevel-no-skip-subrecords", "delevel_no_skip_subrecords", "delevel-subrecords-no-skip", "delevel_subrecords_no_skip", "delev-skip-no-subrecord", "delev_skip_no_subrecord", "delev-subrecord-skip-no", "delev_subrecord_skip_no", "delev-skip-no-subrecords", "delev_skip_no_subrecords", "delev-subrecords-skip-no", "delev_subrecords_skip_no", "delevel-skip-no-subrecord", "delevel_skip_no_subrecord", "delevel-subrecord-skip-no", "delevel_subrecord_skip_no", "delevel-skip-no-subrecords", "delevel_skip_no_subrecords", "delevel-subrecords-skip-no", "delevel_subrecords_skip_no"],
+        help = "Delevel these subrecords even if they match --delev-skip-subrecord",
+        value_name = "SUBRECORD(S)",
+        use_value_delimiter = true,
+        value_delimiter = ',',
+        verbatim_doc_comment
+    )]
+    pub(super) delev_no_skip_subrecord: Option<Vec<String>>,
+    /// Do not compare plugins.
+    ///
+    /// By default output plugin is compared with previous version if there is one(same filename). It's not written if previous version is the same.
+    #[arg(
+        help_heading = "Compare",
+        conflicts_with = "settings_write",
+        long, aliases = ["no_compare", "compare-no", "compare_no"], help = "Do not compare plugins")]
+    pub(super) no_compare: bool,
+    /// Plugin to compare output plugin with.
+    ///
+    /// This flag allows to compare output plugin with any other plugin. By default output plugin is compared with previous version if there is one(same filename).
+    ///
+    /// This flag conflicts with --no-compare.
+    #[arg(
+        help_heading = "Compare",
+        conflicts_with_all = ["settings_write", "no_compare"],
+        long,
+        value_name = "PATH",
+        value_hint = clap::ValueHint::Other,
+        alias = "compare_with",
+        help = "Plugin to compare output plugin with"
+    )]
+    pub(super) compare_with: Option<String>,
+    /// Plugin to compare delev output plugin with.
+    ///
+    /// This flag allows to compare delev plugin with any other plugin. By default delev plugin is compared with previous version if there is one(same filename).
+    ///
+    /// This flag requires --delev-distinct. Conflicts with --no-compare.
+    #[arg(
+        help_heading = "Compare",
+        requires = "delev_distinct",
+        conflicts_with_all = ["settings_write", "no_compare"],
+        long,
+        value_name = "PATH",
+        value_hint = clap::ValueHint::Other,
+        aliases = ["compare_delev_with", "delev-compare-with", "delev_compare_with"],
+        help = "Plugin to compare delev output plugin with"
+    )]
+    pub(super) compare_delev_with: Option<String>,
     /// Show more information. May be provided twice for extra effect.
     ///
     /// This flag conflicts with --quiet.

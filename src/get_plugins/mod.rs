@@ -8,6 +8,8 @@ use std::{
 };
 mod get_game_config;
 use get_game_config::get_game_config;
+mod get_plugins_to_compare;
+pub(crate) use get_plugins_to_compare::get_plugins_to_compare;
 
 #[derive(PartialEq)]
 pub(crate) struct PluginInfo {

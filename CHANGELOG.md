@@ -3,6 +3,32 @@
 <!-- markdownlint-disable MD036 -->
 # Changelog
 
+## 0.3.0 (2023-12-05)
+
+**Breaking changes**
+
+* Rename `--no-creatures` to `--skip-creatures` to be in line with similar options.
+* Rename `--no-items` to `--skip-items` to be in line with similar options.
+
+New features
+
+* Compare plugins:
+  * Enabled by default and compares output plugin with it's previous version(if there is one).
+  * Add `--no-compare` option to disable comparison.
+  * Add `--compare-with` option to compare with another plugin instead of previous version.
+* New delevel filters:
+  * Add `--delev-skip-list` option to skip leveled lists by name.
+  * Add `--delev-skip-subrecords` option to skip subrecords(items, creatures) by name.
+* Auto-backup of previous output plugin(s):
+  * Add `--no-backup` option to stop making backups of output plugins, log file and settings file.
+
+Miscellaneous
+
+* Rename instead of copy for backups to preserve timestamps.
+* Increase verbosity level required to display details on deleted subrecords.
+* All backups now have `.backup` file extension.
+* Reword several messages.
+
 ## 0.2.1 (2023-11-20)
 
 Fixes

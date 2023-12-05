@@ -1,6 +1,7 @@
 use super::{DeletedSubrecords, DeleveledSubrecords, Helper, UntouchedList};
 use crate::{
-    get_plugin_size, Cfg, Creature, Item, LastCreature, LastItem, Log, PluginInfo, PluginName, ResponsiblePlugins, Subrecord,
+    get_plugin_size, Cfg, ComparePlugins, Creature, DelevSkipPatterns, Item, LastCreature, LastItem, Log, PluginInfo, PluginName,
+    ResponsiblePlugins, Subrecord,
 };
 use anyhow::{anyhow, Result};
 use std::collections::{hash_map::Entry, HashMap};
@@ -43,8 +44,16 @@ macro_rules! make_lists {
                 };
 
                 let mut is_delev = false;
-                if $cfg.delev && !$cfg.$name.no_delev {
-                    let delev_list = delevel_list(&$name, &$cfg.$name.delev_to, &o.id, &$cfg.$name.log_t, &o.masters[0], &mut $h);
+                if $cfg.delev && !$cfg.$name.skip_delev {
+                    let delev_list = delevel_list(
+                        &$name,
+                        &$cfg.$name.delev_to,
+                        &o.id,
+                        &$cfg.$name.log_t,
+                        &o.masters[0],
+                        $cfg,
+                        &mut $h,
+                    );
                     if !delev_list.is_empty() {
                         $h.counts.delev.deleveled += 1;
                         if $cfg.delev_distinct {
@@ -121,12 +130,18 @@ macro_rules! make_lists {
     };
 }
 
-pub(super) fn make_lists<'a>(creatures: Vec<Creature<'a>>, items: Vec<Item<'a>>, cfg: &'a Cfg, log: &mut Log) -> Result<Helper<'a>> {
-    let mut h = Helper::new();
-    if !cfg.creatures.no {
+pub(super) fn make_lists<'a>(
+    creatures: Vec<Creature<'a>>,
+    items: Vec<Item<'a>>,
+    plugins_to_compare: ComparePlugins,
+    cfg: &'a Cfg,
+    log: &mut Log,
+) -> Result<Helper<'a>> {
+    let mut h = Helper::new(plugins_to_compare);
+    if !cfg.creatures.skip {
         make_lists!(creatures, LeveledCreature, leveled_creature_flags, creature_differs, h, cfg, log);
     }
-    if !cfg.items.no {
+    if !cfg.items.skip {
         make_lists!(items, LeveledItem, leveled_item_flags, item_differs, h, cfg, log);
     }
     Ok(h)
@@ -265,16 +280,20 @@ fn item_differs(
 fn delevel_list<'a>(
     list: &[Subrecord],
     delev_lvl: &u16,
-    id: &String,
+    id: &str,
     log_t: &'a str,
     plugin_info: &'a PluginInfo,
+    cfg: &Cfg,
     h: &mut Helper<'a>,
 ) -> Vec<Subrecord> {
     let mut res = Vec::new();
     if list.iter().any(|(_, level)| level > delev_lvl) {
+        if delev_skip(id, &cfg.delev_skip_list, &cfg.delev_no_skip_list) {
+            return res;
+        }
         let mut subrecords = Vec::new();
         for (name, level) in list.iter() {
-            if level > delev_lvl {
+            if level > delev_lvl && !delev_skip(name, &cfg.delev_skip_subrecord, &cfg.delev_no_skip_subrecord) {
                 res.push((name.clone(), *delev_lvl));
                 subrecords.push(((name.to_lowercase(), *level), *delev_lvl));
                 h.counts.delev.deleveled_subrecord += 1;
@@ -290,4 +309,27 @@ fn delevel_list<'a>(
         });
     };
     res
+}
+
+fn delev_skip(string: &str, patterns: &DelevSkipPatterns, no_patterns: &DelevSkipPatterns) -> bool {
+    if !patterns.is_empty {
+        let string_lowercased = string.to_lowercase();
+        if (patterns.exact.iter().any(|exact| &string_lowercased == exact)
+            || patterns.prefix.iter().any(|prefix| string_lowercased.starts_with(prefix))
+            || patterns.suffix.iter().any(|suffix| string_lowercased.ends_with(suffix))
+            || patterns.infix.iter().any(|infix| string_lowercased.contains(infix)))
+            && !delev_no_skip(&string_lowercased, no_patterns)
+        {
+            return true;
+        }
+    }
+    false
+}
+
+fn delev_no_skip(string_lowercased: &str, patterns: &DelevSkipPatterns) -> bool {
+    !patterns.is_empty
+        && (patterns.exact.iter().any(|exact| string_lowercased == exact)
+            || patterns.prefix.iter().any(|prefix| string_lowercased.starts_with(prefix))
+            || patterns.suffix.iter().any(|suffix| string_lowercased.ends_with(suffix))
+            || patterns.infix.iter().any(|infix| string_lowercased.contains(infix)))
 }

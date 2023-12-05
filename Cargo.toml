@@ -1,10 +1,10 @@
 [package]
 name = "jobasha"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["alvazir <basha.alvazir@gmail.com>"]
 edition = "2021"
 rust-version = "1.74.0"
-description = "Jobasha - TES3 leveled list merging and deleveling tool"
+description = "Jobasha - TES3 leveled list tool"
 readme = "README.md"
 homepage = "https://www.nexusmods.com/morrowind/mods/52707"
 repository = "https://github.com/alvazir/jobasha"
@@ -19,22 +19,32 @@ maintenance = { status = "actively-developed" }
 [dependencies.tes3]
 # path = "../tes3"
 git = "https://github.com/Greatness7/tes3"
-rev = "2fae07a0"
+rev = "4a08175f"
 # branch = "dev"
 default-features = false
 features = ["esp"]
 
 [dependencies]
-clap = { version = "~4.4.8", features = ["derive", "suggestions", "wrap_help"] } # CLI
-confique = { version = "~0.2.4", default-features = false, features = ["toml"] } # settings file
-serde = "~1.0.192"                                                               # required by confique
-anyhow = "~1.0.75"                                                               # error management
-dirs = "~5.0.1"                                                                  # find openmw.cfg
-rayon = "~1.8.0"                                                                 # find files in parallel
-fs-err = "~2.10.0"                                                               # better fs errors
-console = "~0.15.7"                                                              # colored output
-indicatif = "~0.17.7"                                                            # progress bar
-chrono = "~0.4.31"                                                               # get date to put into result's name
+# CLI
+clap = { version = "~4.4.11", features = ["derive", "suggestions", "wrap_help"] }
+# settings file
+confique = { version = "~0.2.4", default-features = false, features = ["toml"] }
+# required by confique
+serde = "~1.0.193"
+# error management
+anyhow = "~1.0.75"
+# find openmw.cfg
+dirs = "~5.0.1"
+# find files in parallel
+rayon = "~1.8.0"
+# better fs errors
+fs-err = "~2.11.0"
+# colored output
+console = "~0.15.7"
+# progress bar
+indicatif = "~0.17.7"
+# get date to put into result's name
+chrono = "~0.4.31"
 
 [profile.release-lto]
 inherits = "release"

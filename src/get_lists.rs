@@ -291,10 +291,10 @@ pub(super) fn get_lists<'a>(
             return Err(anyhow!("Failed to read plugin \"{}\"\n{}", &plugin_info.name, error));
         };
         stats.get_records(&helper.plugin_content.objects[0]);
-        if !cfg.creatures.no {
+        if !cfg.creatures.skip {
             get_lists!(creatures, helper, Creature, LeveledCreature, leveled_creature_flags, LastCreature);
         }
-        if !cfg.items.no {
+        if !cfg.items.skip {
             get_lists!(items, helper, Item, LeveledItem, leveled_item_flags, LastItem);
         }
     }

@@ -1,9 +1,9 @@
-use super::{Options, OutputFile, PluginKind, Settings, SettingsFile};
+use super::{DelevSkipPatterns, Options, OutputFile, PluginKind, Settings, SettingsFile};
 use crate::read_lines;
 use anyhow::{anyhow, Context, Result};
 use chrono::Local;
 use console::Style;
-use fs_err::copy;
+use fs_err::rename;
 use std::{
     env::current_exe,
     path::{Path, PathBuf},
@@ -60,22 +60,22 @@ pub(super) fn get_settings_file(exe: &Option<String>, dir: &Option<PathBuf>, opt
     Ok(settings_file)
 }
 
-pub(super) fn backup_settings_file(settings_file: &mut SettingsFile, backup_suffix: &str) -> Result<u64> {
-    if settings_file.path.exists() {
+pub(super) fn backup_settings_file(settings_file: &mut SettingsFile, backup_suffix: &str, no_backup: bool) -> Result<()> {
+    if !no_backup && settings_file.path.exists() {
         let mut backup_path = settings_file.path.clone().into_os_string();
         backup_path.push(backup_suffix);
         settings_file.backup_path = backup_path.into();
         settings_file.backup_overwritten = settings_file.backup_path.exists();
         settings_file.backup_written = true;
-        copy(&settings_file.path, &settings_file.backup_path).with_context(|| {
+        rename(&settings_file.path, &settings_file.backup_path).with_context(|| {
             format!(
-                "Failed to backup program settings \"{}\" to \"{}\"",
+                "Failed to rename previous program settings \"{}\" to \"{}\"",
                 &settings_file.path.display(),
                 &settings_file.backup_path.display()
             )
         })
     } else {
-        Ok(0)
+        Ok(())
     }
 }
 
@@ -210,12 +210,14 @@ pub(super) fn get_output_file(opt: &Options, set: &Settings, kind: PluginKind) -
         name = format!("{}.{}", stem, extension);
         path = dir_path.join(&name);
     };
+    let backup_path = dir_path.join(format!("{name}{}", &set.guts.output_backup_suffix));
     Ok(OutputFile {
         kind,
         name,
         name_lowercased_starts_with,
         path,
         dir_path,
+        backup_path,
     })
 }
 
@@ -286,4 +288,29 @@ pub(super) fn check_settings_version(settings_file: &mut SettingsFile) -> Result
         }
     }
     Ok(())
+}
+
+pub(super) fn prepare_delev_skip_patterns(raw_patterns: Vec<String>) -> DelevSkipPatterns {
+    let (mut exact, mut prefix, mut infix, mut suffix) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+    let is_empty = raw_patterns.is_empty();
+    if !is_empty {
+        for pattern in raw_patterns {
+            if let Some(remainder) = pattern.strip_prefix("prefix:") {
+                prefix.push(remainder.to_owned());
+            } else if let Some(remainder) = pattern.strip_prefix("infix:") {
+                infix.push(remainder.to_owned());
+            } else if let Some(remainder) = pattern.strip_prefix("suffix:") {
+                suffix.push(remainder.to_owned());
+            } else {
+                exact.push(pattern);
+            }
+        }
+    }
+    DelevSkipPatterns {
+        is_empty,
+        exact,
+        prefix,
+        infix,
+        suffix,
+    }
 }

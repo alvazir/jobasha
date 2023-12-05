@@ -3,22 +3,40 @@
 
 # Jobasha
 
-TES3 leveled list merging and deleveling tool.  
+TES3 leveled list tool.  
 
 ## Description
 
-Jobasha will perfectly organize all your lists in his library. It is a [command line](https://en.wikipedia.org/wiki/Command-line_interface) tool for [leveled list](https://en.uesp.net/wiki/Morrowind:Leveled_Lists) merging and deleveling.  
+Jobasha will perfectly organize all your lists in his library. It is a [command line](https://en.wikipedia.org/wiki/Command-line_interface) tool for [leveled list](https://en.uesp.net/wiki/Morrowind:Leveled_Lists) merging, deleveling and comparison.  
 
 ## Features
 
 * [Merge leveled lists](https://en.uesp.net/wiki/Morrowind_Mod:Leveled_Lists#List_Merging)  
 * Delete subrecords from merged leveled lists  
 * Delevel subrecords  
+* Compare leveled lists between plugins  
 * Process both **Morrowind.ini** and **openmw.cfg**  
 * Show detailed information  
 
 ## Usage
 
+<!-- markdownlint-disable MD007 -->
+* Most basic usage: `jobasha` to merge leveled lists
+  <details>
+
+  <summary>The program is flexible and allows complicated scenarios, though basic usage is simple</summary>
+
+    * To provide non-default game configuration file:
+      * `jobasha -c C:\another\profile\openmw.cfg`  
+    * To delevel subrecords to level 1 in addition to merging leveled lists:
+      * `jobasha -d`  
+    * To delevel subrecords to level 5 in addition to merging leveled lists:
+      * `jobasha -dt 5`
+    * Almost everything may be done with command-line arguments, though settings file is the better way for advanced usage:  
+      * `jobasha --settings-write` to create settings file  
+      * `jobasha` afterwards to use it  
+
+  </details>
 * Type command `jobasha -h` for brief help
 * Type command `jobasha --help` for extended help
 * Type command `jobasha -? <OPTION>` to get extended help for a specific option
@@ -28,8 +46,8 @@ Jobasha will perfectly organize all your lists in his library. It is a [command 
   <summary>Brief help</summary>
 
   ```text
-  Jobasha - TES3 leveled list merging and deleveling tool
-
+  Jobasha - TES3 leveled list tool
+  
   Usage: jobasha [OPTIONS]
   
   Options:
@@ -42,6 +60,7 @@ Jobasha will perfectly organize all your lists in his library. It is a [command 
     -L, --no-log                Do not write log
     -s, --settings <PATH>       Name of the program settings file
         --settings-write        Write default program settings file and exit
+        --no-backup             Do not make backups
         --ignore-errors         Ignore non-critical errors
     -?, --help-option <OPTION>  Print help for the specific option
     -h, --help                  Print help (see more with '--help')
@@ -54,8 +73,8 @@ Jobasha will perfectly organize all your lists in his library. It is a [command 
         --no-skip-default                  Do not skip plugins defined by default
         --skip-unexpected-tags             Skip plugins that contain unexpected record types
         --no-skip-unexpected-tags-default  Do not skip plugins that contain known unexpected record types
-        --no-creatures                     Do not process creature leveled lists
-        --no-items                         Do not process item leveled lists
+        --skip-creatures                   Do not process creature leveled lists
+        --skip-items                       Do not process item leveled lists
   
   Subrecord deletion:
     -D, --no-delete                  Do not delete subrecords from leveled lists
@@ -71,10 +90,21 @@ Jobasha will perfectly organize all your lists in his library. It is a [command 
     -t, --delev-to <1>              Set level to delevel subrecords to
         --delev-creatures-to <LVL>  Set level to delevel creature subrecords to
         --delev-items-to <LVL>      Set level to delevel item subrecords to
-        --delev-no-creatures        Do not delevel creature subrecords
-    -I, --delev-no-items            Do not delevel item subrecords
         --delev-distinct            Place deleveled lists into the additional output plugin
         --delev-output <PATH>       Name of the distinct delev output plugin
+  
+  Delev filters:
+        --delev-skip-creatures                    Do not delevel creature subrecords
+    -I, --delev-skip-items                        Do not delevel item subrecords
+        --delev-skip-list <LIST(S)>               Do not delevel these lists
+        --delev-no-skip-list <LIST(S)>            Delevel these lists even if they match --delev-skip-list
+        --delev-skip-subrecord <SUBRECORD(S)>     Do not delevel these subrecords
+        --delev-no-skip-subrecord <SUBRECORD(S)>  Delevel these subrecords even if they match --delev-skip-subrecord
+  
+  Compare:
+        --no-compare                 Do not compare plugins
+        --compare-with <PATH>        Plugin to compare output plugin with
+        --compare-delev-with <PATH>  Plugin to compare delev output plugin with
   
   Display output:
     -v, --verbose...    Show more information
@@ -128,7 +158,7 @@ Please see the [CHANGELOG](CHANGELOG.md) for a release history.
 
 <details>
 
-<summary>Jobasha is written in Rust, so you'll need to grab a [Rust installation](https://www.rust-lang.org) in order to compile it. Jobasha compiles with Rust 1.74.0(stable) or newer</summary>
+<summary>Jobasha is written in Rust, so you'll need to grab https://www.rust-lang.org in order to compile it. Jobasha compiles with Rust 1.74.0(stable) or newer</summary>
 
 ```shell
 git clone https://github.com/alvazir/jobasha
