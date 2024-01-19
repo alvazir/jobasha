@@ -1,5 +1,5 @@
 use super::{DelevSkipPatterns, Options, OutputFile, PluginKind, Settings, SettingsFile};
-use crate::read_lines;
+use crate::{get_delev_segment_ceil, read_lines};
 use anyhow::{anyhow, Context, Result};
 use chrono::Local;
 use console::Style;
@@ -135,7 +135,7 @@ pub(super) fn get_progress_frequency(frequency: u8) -> Result<u8> {
     }
 }
 
-pub(super) fn get_output_file(opt: &Options, set: &Settings, kind: PluginKind) -> Result<OutputFile> {
+pub(super) fn get_output_file(opt: &Options, set: &Settings, kind: PluginKind, compare_only_name: &str) -> Result<OutputFile> {
     macro_rules! name_parse_error {
         ($name:ident, $part:expr) => {
             return Err(anyhow!("Failed to parse {} from output plugin name: \"{}\"", $part, $name,))
@@ -187,12 +187,12 @@ pub(super) fn get_output_file(opt: &Options, set: &Settings, kind: PluginKind) -
         None => set.guts.output_extension_default.clone(),
     };
     let mut name_lowercased_starts_with = String::new();
-    let no_date = match opt.no_date {
-        true => opt.no_date,
-        false => set.options.no_date,
+    let date = match opt.date {
+        true => opt.date,
+        false => set.options.date,
     };
-    let name: String;
-    if !no_date {
+    let mut name: String;
+    if date {
         let separator_default = &set.guts.output_date_separators[0];
         let date_infix = format!("{}{}", separator_default, Local::now().format(&set.guts.output_date_format));
         name_lowercased_starts_with = format!("{}{}", stem, separator_default).to_lowercase();
@@ -211,6 +211,9 @@ pub(super) fn get_output_file(opt: &Options, set: &Settings, kind: PluginKind) -
         path = dir_path.join(&name);
     };
     let backup_path = dir_path.join(format!("{name}{}", &set.guts.output_backup_suffix));
+    if !compare_only_name.is_empty() {
+        name = compare_only_name.to_owned();
+    }
     Ok(OutputFile {
         kind,
         name,
@@ -234,6 +237,27 @@ pub(super) fn get_kind_delev_to(lvl: u16, kind_lvl: u16) -> u16 {
     } else {
         lvl
     }
+}
+
+pub(super) fn get_kind_delev_segment(
+    kind_str: &str,
+    delev_to: u16,
+    delev_segment_ratio: f64,
+    lvl: u16,
+    kind_lvl: u16,
+) -> Result<(u16, u16)> {
+    let segment = if kind_lvl != 0 { kind_lvl } else { lvl };
+    let mut ceil = 0;
+    if segment != 0 {
+        if segment < delev_to {
+            return Err(anyhow!(
+                "{kind_str} delev_segment({segment}) should be larger or equal to the corresponding level to delevel to({delev_to})"
+            ));
+        } else {
+            ceil = get_delev_segment_ceil(&segment, segment, delev_to, delev_segment_ratio);
+        }
+    }
+    Ok((segment, ceil))
 }
 
 pub(super) fn check_verboseness(verboseness: u8, name: &str) -> Result<u8> {
@@ -270,7 +294,7 @@ pub(super) fn check_settings_version(settings_file: &mut SettingsFile) -> Result
         let settings_toml_lines = read_lines(&settings_file.path)
             .with_context(|| format!("Failed to read program configuration file \"{}\"", &settings_file.path.display()))?;
         let settings_version_prefix = "# # Settings version: ";
-        let expected_settings_version = String::from("0.2.1");
+        let expected_settings_version = String::from("0.4.0");
         let mut detected_settings_version = String::from("0.1.0");
         for line in settings_toml_lines.flatten() {
             if line.starts_with(settings_version_prefix) {
@@ -312,5 +336,12 @@ pub(super) fn prepare_delev_skip_patterns(raw_patterns: Vec<String>) -> DelevSki
         prefix,
         infix,
         suffix,
+    }
+}
+
+pub(super) fn get_compare_only(compare_only: &Option<String>) -> (bool, String) {
+    match compare_only {
+        None => (false, String::new()),
+        Some(value) => (true, value.to_owned()),
     }
 }

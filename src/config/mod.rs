@@ -10,9 +10,9 @@ mod util;
 use options::{get_options, Options};
 use settings::{get_settings, Settings};
 use util::{
-    append_default_to_skip, backup_settings_file, check_settings_version, check_verboseness, get_color, get_delev_to,
-    get_exe_name_and_dir, get_kind_delev_to, get_log_file, get_output_file, get_progress_frequency, get_settings_file,
-    prepare_delev_skip_patterns, prepare_plugin_extensions_to_ignore,
+    append_default_to_skip, backup_settings_file, check_settings_version, check_verboseness, get_color, get_compare_only,
+    get_delev_to, get_exe_name_and_dir, get_kind_delev_segment, get_kind_delev_to, get_log_file, get_output_file,
+    get_progress_frequency, get_settings_file, prepare_delev_skip_patterns, prepare_plugin_extensions_to_ignore,
 };
 
 pub(crate) struct Cfg {
@@ -29,8 +29,8 @@ pub(crate) struct Cfg {
     pub(crate) skip: Vec<String>,
     pub(crate) skip_unexpected_tags: bool,
     pub(crate) no_skip_unexpected_tags_default: bool,
-    pub(crate) creatures: Kind,
-    pub(crate) items: Kind,
+    pub(crate) creatures: ListKind,
+    pub(crate) items: ListKind,
     pub(crate) no_delete: bool,
     pub(crate) extended_delete: bool,
     pub(crate) always_delete: Vec<String>,
@@ -39,13 +39,18 @@ pub(crate) struct Cfg {
     pub(crate) delev: bool,
     pub(crate) delev_distinct: bool,
     pub(crate) delev_output: OutputFile,
+    pub(crate) delev_segment_progressive: bool,
+    pub(crate) delev_segment_ratio: f64,
     pub(crate) delev_skip_list: DelevSkipPatterns,
     pub(crate) delev_no_skip_list: DelevSkipPatterns,
     pub(crate) delev_skip_subrecord: DelevSkipPatterns,
     pub(crate) delev_no_skip_subrecord: DelevSkipPatterns,
     pub(crate) no_compare: bool,
+    pub(crate) compare_only: bool,
+    pub(crate) compare_only_name: String,
     pub(crate) compare_with: String,
     pub(crate) compare_delev_with: String,
+    pub(crate) compare_common: bool,
     pub(crate) verbose: u8,
     pub(crate) quiet: bool,
     pub(crate) progress: bool,
@@ -72,12 +77,14 @@ pub(crate) struct DelevSkipPatterns {
     pub(crate) suffix: Vec<String>,
 }
 
-pub(crate) struct Kind {
+pub(crate) struct ListKind {
     pub(crate) skip: bool,
     pub(crate) threshold: f64,
     pub(crate) log_t: String,
     pub(crate) skip_delev: bool,
     pub(crate) delev_to: u16,
+    pub(crate) delev_segment: u16,
+    pub(crate) delev_segment_ceil: u16,
 }
 
 pub(crate) enum PluginKind {
@@ -108,7 +115,11 @@ pub(crate) struct Guts {
     pub(crate) omw_line_beginning_data: String,
     pub(crate) omw_plugin_extensions: Vec<OsString>,
     pub(crate) plugin_extensions_to_ignore: Vec<String>,
+    pub(crate) skip_default_reasons: Vec<Vec<String>>,
     pub(crate) skip_unexpected_tags_default: Vec<String>,
+    pub(crate) omw_cs_data_path_suffix_linux_macos: String,
+    pub(crate) omw_cs_data_path_suffix_windows: String,
+    pub(crate) omw_cs_data_paths_list: Vec<String>,
     pub(crate) header_version: f32,
     pub(crate) header_author: String,
     pub(crate) header_description_merge: String,
@@ -185,10 +196,29 @@ impl Cfg {
         }
         let no_log = opt_or_set_bool!(no_log);
         let delev_to = get_delev_to(opt_or_set_some!(delev_to))?;
+        let delev_creatures_to = get_kind_delev_to(delev_to, opt_or_set_some!(delev_creatures_to));
+        let delev_items_to = get_kind_delev_to(delev_to, opt_or_set_some!(delev_items_to));
+        let delev_segment = opt_or_set_some!(delev_segment);
+        let delev_segment_ratio = opt_or_set_threshold!(delev_segment_ratio, "delev_segment_ratio");
+        let (creatures_delev_segment, creatures_delev_segment_ceil) = get_kind_delev_segment(
+            "Creatures",
+            delev_creatures_to,
+            delev_segment_ratio,
+            delev_segment,
+            opt_or_set_some!(delev_creatures_segment),
+        )?;
+        let (items_delev_segment, items_delev_segment_ceil) = get_kind_delev_segment(
+            "Items",
+            delev_items_to,
+            delev_segment_ratio,
+            delev_segment,
+            opt_or_set_some!(delev_items_segment),
+        )?;
         let no_skip_default = opt_or_set_bool!(no_skip_default);
+        let (compare_only, compare_only_name) = get_compare_only(&opt.compare_only);
         Ok(Cfg {
-            output: get_output_file(&opt, &set, PluginKind::Merge)?,
-            delev_output: get_output_file(&opt, &set, PluginKind::Delev)?,
+            output: get_output_file(&opt, &set, PluginKind::Merge, &compare_only_name)?,
+            delev_output: get_output_file(&opt, &set, PluginKind::Delev, "")?,
             config: opt_or_set_some!(config),
             dry_run: opt_or_set_bool!(dry_run),
             no_log,
@@ -205,19 +235,23 @@ impl Cfg {
             },
             skip_unexpected_tags: opt_or_set_bool!(skip_unexpected_tags),
             no_skip_unexpected_tags_default: opt_or_set_bool!(no_skip_unexpected_tags_default),
-            creatures: Kind {
+            creatures: ListKind {
                 skip: opt_or_set_bool!(skip_creatures),
                 threshold: opt_or_set_threshold!(threshold_creatures, "threshold_creatures"),
                 log_t: set.guts.log_t_creature,
                 skip_delev: opt_or_set_bool!(delev_skip_creatures),
-                delev_to: get_kind_delev_to(delev_to, opt_or_set_some!(delev_creatures_to)),
+                delev_to: delev_creatures_to,
+                delev_segment: creatures_delev_segment,
+                delev_segment_ceil: creatures_delev_segment_ceil,
             },
-            items: Kind {
+            items: ListKind {
                 skip: opt_or_set_bool!(skip_items),
                 threshold: opt_or_set_threshold!(threshold_items, "threshold_items"),
                 log_t: set.guts.log_t_item,
                 skip_delev: opt_or_set_bool!(delev_skip_items),
-                delev_to: get_kind_delev_to(delev_to, opt_or_set_some!(delev_items_to)),
+                delev_to: delev_items_to,
+                delev_segment: items_delev_segment,
+                delev_segment_ceil: items_delev_segment_ceil,
             },
             no_delete: opt_or_set_bool!(no_delete),
             extended_delete: opt_or_set_bool!(extended_delete),
@@ -226,13 +260,18 @@ impl Cfg {
             no_threshold_warnings: opt_or_set_bool!(no_threshold_warnings),
             delev: opt_or_set_bool!(delev),
             delev_distinct: opt_or_set_bool!(delev_distinct),
+            delev_segment_progressive: opt_or_set_bool!(delev_segment_progressive),
+            delev_segment_ratio,
             delev_skip_list: prepare_delev_skip_patterns(opt_or_set_vec_lowercase!(delev_skip_list)),
             delev_no_skip_list: prepare_delev_skip_patterns(opt_or_set_vec_lowercase!(delev_no_skip_list)),
             delev_skip_subrecord: prepare_delev_skip_patterns(opt_or_set_vec_lowercase!(delev_skip_subrecord)),
             delev_no_skip_subrecord: prepare_delev_skip_patterns(opt_or_set_vec_lowercase!(delev_no_skip_subrecord)),
             no_compare: opt_or_set_bool!(no_compare),
+            compare_only,
+            compare_only_name,
             compare_with: opt_or_set_some!(compare_with),
             compare_delev_with: opt_or_set_some!(compare_delev_with),
+            compare_common: opt_or_set_bool!(compare_common),
             verbose: if opt.verbose == 0 {
                 get_verbose!(set.options.verbose)
             } else {
@@ -257,7 +296,15 @@ impl Cfg {
                 omw_line_beginning_data: set.guts.omw_line_beginning_data,
                 omw_plugin_extensions: set_ext!(set.guts.omw_plugin_extensions),
                 plugin_extensions_to_ignore: prepare_plugin_extensions_to_ignore(set.guts.plugin_extensions_to_ignore),
+                skip_default_reasons: if no_skip_default {
+                    Vec::new()
+                } else {
+                    set.guts.skip_default_reasons
+                },
                 skip_unexpected_tags_default: set.guts.skip_unexpected_tags_default.iter().map(|tag| tag.to_lowercase()).collect(),
+                omw_cs_data_path_suffix_linux_macos: set.guts.omw_cs_data_path_suffix_linux_macos,
+                omw_cs_data_path_suffix_windows: set.guts.omw_cs_data_path_suffix_windows,
+                omw_cs_data_paths_list: set.guts.omw_cs_data_paths_list,
                 header_version: set.guts.header_version,
                 header_author: set.guts.header_author,
                 header_description_merge: set.guts.header_description_merge,

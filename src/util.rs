@@ -341,3 +341,7 @@ fn backup_log_file(log_file: &PathBuf, backup_suffix: &str, no_backup: bool) -> 
         String::new()
     }
 }
+
+pub(crate) fn get_delev_segment_ceil(level: &u16, delev_segment: u16, delev_to: u16, delev_segment_ratio: f64) -> u16 {
+    (((level / delev_segment) * (delev_segment - delev_to)) as f64 * (delev_segment_ratio / 100.0)).ceil() as u16 + delev_to
+}

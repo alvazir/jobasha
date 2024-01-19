@@ -1,9 +1,9 @@
 [package]
 name = "jobasha"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["alvazir <basha.alvazir@gmail.com>"]
 edition = "2021"
-rust-version = "1.74.0"
+rust-version = "1.75.0"
 description = "Jobasha - TES3 leveled list tool"
 readme = "README.md"
 homepage = "https://www.nexusmods.com/morrowind/mods/52707"
@@ -26,25 +26,27 @@ features = ["esp"]
 
 [dependencies]
 # CLI
-clap = { version = "~4.4.11", features = ["derive", "suggestions", "wrap_help"] }
+clap = { version = "~4.4.18", features = ["derive", "suggestions", "wrap_help"] }
 # settings file
-confique = { version = "~0.2.4", default-features = false, features = ["toml"] }
+confique = { version = "~0.2.5", default-features = false, features = ["toml"] }
 # required by confique
-serde = "~1.0.193"
+serde = "~1.0.195"
 # error management
-anyhow = "~1.0.75"
+anyhow = "~1.0.79"
 # find openmw.cfg
 dirs = "~5.0.1"
 # find files in parallel
-rayon = "~1.8.0"
+rayon = "~1.8.1"
 # better fs errors
 fs-err = "~2.11.0"
 # colored output
-console = "~0.15.7"
+console = "~0.15.8"
 # progress bar
 indicatif = "~0.17.7"
 # get date to put into result's name
 chrono = "~0.4.31"
+# memory usage
+# peak_alloc = "~0.2.0" # disabled due to slowing down the program
 
 [profile.release-lto]
 inherits = "release"

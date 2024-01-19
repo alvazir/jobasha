@@ -21,10 +21,10 @@ pub(super) fn process_output(
     plugins_to_compare: ComparePlugins,
     cfg: &Cfg,
     log: &mut Log,
-) -> Result<(ListCounts, bool)> {
+) -> Result<(ListCounts, i32)> {
     let mut h: Helper = make_lists(creatures, items, plugins_to_compare, cfg, log)?;
     if !(cfg.no_log && cfg.quiet) {
-        show_messages(&h.messages, &h.counts, &mut h.warning, cfg, log)?;
+        show_messages(&h.messages, &h.counts, &mut h.exit_code, cfg, log)?;
     }
     if cfg.delev && !cfg.delev_distinct {
         make_plugin(
@@ -39,9 +39,11 @@ pub(super) fn process_output(
     if cfg.delev_distinct {
         make_plugin(&mut h.delev, h.counts.delev.placed, &cfg.guts.header_description_delev, cfg);
     }
-    write_plugins(&mut h, cfg, log).with_context(|| "Failed to write plugin")?;
-    compare_plugins(&h, cfg, log).with_context(|| "Failed to compare plugins")?;
-    Ok((h.counts, h.warning))
+    if !cfg.compare_only {
+        write_plugins(&mut h, cfg, log).with_context(|| "Failed to write plugin")?;
+    }
+    compare_plugins(&mut h, cfg, log).with_context(|| "Failed to compare plugins")?;
+    Ok((h.counts, h.exit_code))
 }
 
 fn make_plugin(raw: &mut RawOutputPlugin, counts_placed: usize, description: &str, cfg: &Cfg) {

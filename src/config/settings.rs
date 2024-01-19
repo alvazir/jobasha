@@ -23,7 +23,7 @@ pub(super) struct Options {
     #[config(default = "")]
     pub(super) output_dir: String,
     #[config(default = false)]
-    pub(super) no_date: bool,
+    pub(super) date: bool,
     #[config(default = false)]
     pub(super) dry_run: bool,
     #[config(default = "")]
@@ -77,7 +77,7 @@ pub(super) struct Options {
     pub(super) delev: bool,
     #[config(default = 1)]
     pub(super) delev_to: u16,
-    /// Following two sections are effectively disable by default with 0 values.
+    /// Following 2 sections are effectively disabled by default with 0 values.
     #[config(default = 0)]
     pub(super) delev_creatures_to: u16,
     #[config(default = 0)]
@@ -87,6 +87,17 @@ pub(super) struct Options {
     /// By default the value is empty so that "guts.delev_output_infix_default" is added to the output plugin name.
     #[config(default = "")]
     pub(super) delev_output: String,
+    /// Following 3 sections are effectively disabled by default with 0 values.
+    #[config(default = 0)]
+    pub(super) delev_segment: u16,
+    #[config(default = 0)]
+    pub(super) delev_creatures_segment: u16,
+    #[config(default = 0)]
+    pub(super) delev_items_segment: u16,
+    #[config(default = false)]
+    pub(super) delev_segment_progressive: bool,
+    #[config(default = 50)]
+    pub(super) delev_segment_ratio: u8,
     ///
     /// [Delev filters]
     ///
@@ -111,6 +122,8 @@ pub(super) struct Options {
     pub(super) compare_with: String,
     #[config(default = "")]
     pub(super) compare_delev_with: String,
+    #[config(default = false)]
+    pub(super) compare_common: bool,
     ///
     /// [Display output]
     ///
@@ -133,7 +146,7 @@ pub(super) struct Guts {
     /// Guts of the program. Use at your own risk ;-)
     ///
     /// # Following line is used to determine version of used settings to warn about outdated version:
-    /// # Settings version: 0.2.1
+    /// # Settings version: 0.4.0
     ///
     /// [Colors]
     /// Available colors are: blue, cyan, green, magenta, red, yellow, none.
@@ -167,7 +180,7 @@ pub(super) struct Guts {
     pub(super) config_paths_list: Vec<String>,
     ///
     /// [Game configuration file processing]
-    /// These are used to parse Morrowin.ini and openmw.cfg.
+    /// These are used to parse Morrowind.ini and openmw.cfg.
     ///
     #[config(default = "GameFile")]
     pub(super) mor_line_beginning_content: String,
@@ -185,9 +198,25 @@ pub(super) struct Guts {
     /// Following plugins are skipped unless --no-skip-default is set.
     #[config(default = ["Merged Objects.esp", "merged.omwaddon"])]
     pub(super) skip_default: Vec<String>,
+    /// Reason to display when skipping these plugins unless --all-lists is specified.
+    #[config(default = [
+        ["Merged Objects.esp", "This plugin was probably created by TES3Merge. Add \"--all-lists\" to override leveled lists in it.\n  Or set \"LEVC = false\" and \"LEVI = false\" in TES3Merge.ini."],
+        ["merged.omwaddon", "This plugin was probably created by DeltaPlugin. Add \"--all-lists\" to override leveled lists in it."],
+    ])]
+    pub(super) skip_default_reasons: Vec<Vec<String>>,
     /// Plugins with the following record types are skipped unless --no-skip-unexpected-tags-default is set.
-    #[config(default = ["LUAL"])]
+    #[config(default = ["LUAL", "TES3::FORM", "CELL::XSCL"])]
     pub(super) skip_unexpected_tags_default: Vec<String>,
+    /// [Section: "Hidden" OpenMW-CS data directory]
+    ///
+    /// Path that is appended to the "data_dir": "$HOME/.local/share|$HOME/Library/Application Support" + omw_cs_data_path_suffix_linux_macos
+    #[config(default = "openmw/data")]
+    pub(super) omw_cs_data_path_suffix_linux_macos: String,
+    /// Path that is appended to the "document_dir": "C:\Users\Username\Documents" + omw_cs_data_path_suffix_windows
+    #[config(default = "My Games/OpenMW/data")]
+    pub(super) omw_cs_data_path_suffix_windows: String,
+    #[config(default = [])]
+    pub(super) omw_cs_data_paths_list: Vec<String>,
     ///
     /// [Date]
     ///

@@ -54,7 +54,7 @@ Jobasha will perfectly organize all your lists in his library. It is a [command 
     -c, --config <PATH>         Path to the game configuration file
     -o, --output <PATH>         Name of the output plugin
     -O, --output-dir <PATH>     Name of the output plugin directory
-    -n, --no-date               Do not add date to the output plugin name
+        --date                  Add date to the output plugin name
         --dry-run               Do not write output plugin
     -l, --log <PATH>            Name of the log file
     -L, --no-log                Do not write log
@@ -86,12 +86,17 @@ Jobasha will perfectly organize all your lists in his library. It is a [command 
     -T, --no-threshold-warnings      Do not show threshold warnings
   
   Delev:
-    -d, --delev                     Delevel subrecords mode
-    -t, --delev-to <1>              Set level to delevel subrecords to
-        --delev-creatures-to <LVL>  Set level to delevel creature subrecords to
-        --delev-items-to <LVL>      Set level to delevel item subrecords to
-        --delev-distinct            Place deleveled lists into the additional output plugin
-        --delev-output <PATH>       Name of the distinct delev output plugin
+    -d, --delev                        Delevel subrecords mode
+    -t, --delev-to <1>                 Set level to delevel subrecords to
+        --delev-creatures-to <LVL>     Set level to delevel creature subrecords to
+        --delev-items-to <LVL>         Set level to delevel item subrecords to
+        --delev-distinct               Place deleveled lists into the additional output plugin
+        --delev-output <PATH>          Name of the distinct delev output plugin
+    -g, --delev-segment <0>            Set level to segment subrecords for different delev rules
+        --delev-creatures-segment <0>  Set level to segment creature subrecords for different delev rules
+        --delev-items-segment <0>      Set level to segment item subrecords for different delev rules
+    -G, --delev-segment-progressive    Make multiple equal delev segments after the first one
+        --delev-segment-ratio <50>     Set minimal level to delev to for the segment via % ratio
   
   Delev filters:
         --delev-skip-creatures                    Do not delevel creature subrecords
@@ -103,15 +108,17 @@ Jobasha will perfectly organize all your lists in his library. It is a [command 
   
   Compare:
         --no-compare                 Do not compare plugins
-        --compare-with <PATH>        Plugin to compare output plugin with
+    -C, --compare-only <PATH>        Do not merge anything, only compare plugins [aliases: compare]
+    -W, --compare-with <PATH>        Plugin to compare output plugin with [aliases: with]
         --compare-delev-with <PATH>  Plugin to compare delev output plugin with
+        --compare-common             Compare common records only [aliases: common]
   
   Display output:
     -v, --verbose...    Show more information
     -q, --quiet         Do not show anything
-    -p, --progress      Show plugins reading progress
-    -b, --progress-bar  Show plugins reading progress bar
-    -C, --color         Show colored output
+    -B, --progress      Show plugins reading progress
+    -b, --progress-bar  Show plugins reading progress bar [aliases: bar]
+    -p, --color         Show colored output [aliases: pretty]
     -S, --no-summary    Do not show summary
 
   ```
@@ -147,7 +154,7 @@ Please see the [CHANGELOG](CHANGELOG.md) for a release history.
 
 ## Releases
 
-[Binary downloads](https://www.nexusmods.com/morrowind/mods/52707) are available for GNU/Linux(x86-64), Android(AArch64), Windows(x86-64(MSVC, GNU)), macOS(x86-64, AArch64).
+[Binary downloads](https://www.nexusmods.com/morrowind/mods/52707) are available for GNU/Linux(x86-64(GLIBC, MUSL)), Android(AArch64), Windows(x86-64(MSVC, GNU)), macOS(x86-64, AArch64).
 
 ## System requirements
 
@@ -158,7 +165,7 @@ Please see the [CHANGELOG](CHANGELOG.md) for a release history.
 
 <details>
 
-<summary>Jobasha is written in Rust, so you'll need to grab https://www.rust-lang.org in order to compile it. Jobasha compiles with Rust 1.74.0(stable) or newer</summary>
+<summary>Jobasha is written in Rust, so you'll need to grab https://www.rust-lang.org in order to compile it. Jobasha compiles with Rust 1.75.0(stable) or newer</summary>
 
 ```shell
 git clone https://github.com/alvazir/jobasha

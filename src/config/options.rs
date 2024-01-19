@@ -31,7 +31,7 @@ pub(super) struct Options {
     pub(super) config: Option<String>,
     /// Name of the output plugin. May be provided as a path, e.g.: "C:\Morrowind\mods\LeveledLists.esp"(absolute), "mods/LeveledLists.esp"(relative). Non-existent directories will be created.
     ///
-    /// Date is added to the output plugin name by default, e.g. "MergedLeveledLists - YYYY-mm-dd.esp". Use --no-date to disable this behaviour.
+    /// Use --date to add date to the output plugin name, e.g. "MergedLeveledLists - YYYY-mm-dd.esp".
     ///
     /// Default value: "MergedLeveledLists.esp"(will be placed into the current directory).
     #[arg(
@@ -58,15 +58,9 @@ pub(super) struct Options {
         help = "Name of the output plugin directory"
     )]
     pub(super) output_dir: Option<String>,
-    /// Do not add date to the output plugin name.
-    #[arg(
-        conflicts_with = "settings_write",
-        short,
-        long,
-        aliases = ["no_date", "date-no", "date_no"],
-        help = "Do not add date to the output plugin name"
-    )]
-    pub(super) no_date: bool,
+    /// Add date to the output plugin name.
+    #[arg(conflicts_with = "settings_write", long, help = "Add date to the output plugin name")]
+    pub(super) date: bool,
     /// Do not write output plugin.
     #[arg(conflicts_with = "settings_write", long, aliases = ["dry_run", "run-dry", "run_dry"], help = "Do not write output plugin")]
     pub(super) dry_run: bool,
@@ -103,7 +97,7 @@ pub(super) struct Options {
     ///
     /// File will be created in program directory with name "<program_name>.toml" by default. Backup of old settings file will be saved with ".backup" extension. Use --settings to provide another path. Keep in mind that non-default settings file path should be explicitly provided every time you want to use it.
     ///
-    /// This flag conflicts with everything except --settings, --log, --no-log, --color, --no-backup.
+    /// Conflicts with all options except --settings, --log, --no-log, --color, --no-backup.
     #[arg(long, aliases = ["settings_write", "write-settings", "write_settings"], help = "Write default program settings file and exit")]
     pub(super) settings_write: bool,
     /// Do not make backups.
@@ -209,7 +203,7 @@ pub(super) struct Options {
     pub(super) no_skip_unexpected_tags_default: bool,
     /// Do not process creature leveled lists.
     ///
-    /// This flag conflicts with --skip-items.
+    /// Conflicts with --skip-items.
     #[arg(
         help_heading = "Filters",
         conflicts_with_all = ["settings_write", "skip_items"],
@@ -220,7 +214,7 @@ pub(super) struct Options {
     pub(super) skip_creatures: bool,
     /// Do not process item leveled lists.
     ///
-    /// This flag conflicts with --skip-creatures.
+    /// Conflicts with --skip-creatures.
     #[arg(
         help_heading = "Filters",
         conflicts_with_all = ["settings_write", "skip_creatures"],
@@ -231,7 +225,7 @@ pub(super) struct Options {
     pub(super) skip_items: bool,
     /// Do not delete subrecords from leveled lists.
     ///
-    /// This flag conflicts with --extended-delete.
+    /// Conflicts with --extended-delete.
     #[arg(
         help_heading = "Subrecord deletion",
         conflicts_with_all = ["settings_write", "extended_delete", "always_delete", "never_delete", "threshold_creatures", "threshold_items", "no_threshold_warnings"],
@@ -245,7 +239,7 @@ pub(super) struct Options {
     ///
     /// Program only deletes subrecords from leveled lists originating from base game plugins by default, see --always-delete. With --extended-delete subrecords from any leveled list may be deleted. Threshold checks help to identify potential problems. Warning will be displayed when ratio of deleted/initial subrecords per each leveled list exceeds threshold. Then you may adjust thresholds or add plugin name to --never-delete. Or disable warnings completely with --no-threshold-warnings.
     ///
-    /// This flag conflicts with --no-delete. It is required by --never-delete, --threshold_creatures, --threshold_items, --no-threshold-warnings.
+    /// Conflicts with --no-delete. Required by --never-delete, --threshold_creatures, --threshold_items, --no-threshold-warnings.
     #[arg(
         help_heading = "Subrecord deletion",
         conflicts_with_all = ["settings_write", "no_delete"],
@@ -263,7 +257,7 @@ pub(super) struct Options {
     ///
     /// Default value: "Morrowind.esm","Tribunal.esm","Bloodmoon.esm","Tamriel_Data.esm"
     ///
-    /// This flag conflicts with --no-delete.
+    /// Conflicts with --no-delete.
     #[arg(
         help_heading = "Subrecord deletion",
         conflicts_with_all = ["settings_write", "no_delete"],
@@ -285,7 +279,7 @@ pub(super) struct Options {
     ///
     /// Default value: "Wares-base.esm","abotWaterLife.esm","RepopulatedMorrowind.ESM"
     ///
-    /// This flag requires --extended-delete.
+    /// Requires --extended-delete.
     #[arg(
         help_heading = "Subrecord deletion",
         requires = "extended_delete",
@@ -304,7 +298,7 @@ pub(super) struct Options {
     ///
     /// Default value: 67(%).
     ///
-    /// This flag requires --extended-delete. Conflicts with --skip-creatures.
+    /// Requires --extended-delete. Conflicts with --skip-creatures.
     #[arg(
         help_heading = "Subrecord deletion",
         requires = "extended_delete",
@@ -320,7 +314,7 @@ pub(super) struct Options {
     ///
     /// Default value: 49(%).
     ///
-    /// This flag requires --extended-delete. Conflicts with --skip-items.
+    /// Requires --extended-delete. Conflicts with --skip-items.
     #[arg(
         help_heading = "Subrecord deletion",
         requires = "extended_delete",
@@ -336,7 +330,7 @@ pub(super) struct Options {
     ///
     /// Warnings are shown when threshold of deleted/initial subrecords is exceeded for leveled list by default.
     ///
-    /// This flag requires --extended-delete.
+    /// Requires --extended-delete.
     #[arg(
         help_heading = "Subrecord deletion",
         requires = "extended_delete",
@@ -351,7 +345,7 @@ pub(super) struct Options {
     ///
     /// By default it delevels everything to level 1, deleveled lists are placed into the output plugin. Use --delev-to to set different level to delevel to. Use --delev-distinct to place deleveled lists into different output plugin.
     ///
-    /// This flag is required by all other --delev-* flags.
+    /// This option is required by all other --delev-* options.
     #[arg(
         help_heading = "Delev",
         conflicts_with = "settings_write",
@@ -367,7 +361,7 @@ pub(super) struct Options {
     ///
     /// Default value: 1.
     ///
-    /// This flag requires --delev.
+    /// Requires --delev.
     #[arg(
         help_heading = "Delev",
         requires = "delev",
@@ -382,7 +376,7 @@ pub(super) struct Options {
     pub(super) delev_to: Option<u16>,
     /// Set level to delevel creature subrecords to.
     ///
-    /// This flag requires --delev. Conflicts with --skip-creatures, --delev-skip-creatures.
+    /// Requires --delev. Conflicts with --skip-creatures, --delev-skip-creatures.
     #[arg(
         help_heading = "Delev",
         requires = "delev",
@@ -396,7 +390,7 @@ pub(super) struct Options {
     pub(super) delev_creatures_to: Option<u16>,
     /// Set level to delevel item subrecords to.
     ///
-    /// This flag requires --delev. Conflicts with --skip-items, --delev-skip-items.
+    /// Requires --delev. Conflicts with --skip-items, --delev-skip-items.
     #[arg(
         help_heading = "Delev",
         requires = "delev",
@@ -412,7 +406,7 @@ pub(super) struct Options {
     ///
     /// Deleveled lists are placed into the output plugin by default. Use this option to separate merged and deleveled lists. By default additional plugin has the same name as the output plugin with added infix " - Delev", e.g. "MergedLeveledLists - Delev.esp". Use --delev-output to set custom name.
     ///
-    /// This flag requires --delev.
+    /// Requires --delev.
     #[arg(
         help_heading = "Delev",
         requires = "delev",
@@ -428,7 +422,7 @@ pub(super) struct Options {
     ///
     /// Default value: "".
     ///
-    /// This flag requires --delev-distinct.
+    /// Requires --delev-distinct.
     #[arg(
         help_heading = "Delev",
         requires = "delev_distinct",
@@ -440,9 +434,115 @@ pub(super) struct Options {
         help = "Name of the distinct delev output plugin"
     )]
     pub(super) delev_output: Option<String>,
+    /// Set level to segment subrecords for different delev rules.
+    ///
+    /// Subrecords with level greater or equal to the value will be deleveled according to the following formula:
+    ///   new-level = delev-to + (delev-segment - delev-to) * (delev-segment-ratio / 100%)
+    ///     - default value for delev-to is 1
+    ///     - default value for delev-segment-ratio is 50%
+    ///
+    /// It's useful if you want to partialy delevel something(roughly halve it's level by default), e.g. pass 23 if you don't want to encounter Ascended Sleepers(23+) at level 1 and the minimal level to encounter them would be 12 by default.
+    ///   12 = 1 + (23 - 1) * (50 / 100)
+    ///
+    /// Use --delev-creatures-segment or --delev-items-segment to set different values or only segment one type of leveled lists. Use --delev-segment-ratio to modify equation. Use --delev-segment-progressive to make multiple segments.
+    ///
+    /// Default value: 0(disabled).
+    ///
+    /// Requires --delev.
+    #[arg(
+        help_heading = "Delev",
+        requires = "delev",
+        conflicts_with = "settings_write",
+        short = 'g',
+        long,
+        aliases = ["delev_segment", "delevel-segment", "delevel_segment"],
+        help = "Set level to segment subrecords for different delev rules",
+        value_name = "0",
+        value_parser = clap::value_parser!(u16).range(1..)
+    )]
+    pub(super) delev_segment: Option<u16>,
+    /// Set level to segment creature subrecords for different delev rules. See --delev-segment for details.
+    ///
+    /// Default value: 0(disabled).
+    ///
+    /// Requires --delev.
+    #[arg(
+        help_heading = "Delev",
+        requires = "delev",
+        conflicts_with = "settings_write",
+        long,
+        aliases = ["delev_creatures_segment", "delevel-creatures-segment", "delevel_creatures_segment", "delev-creature-segment", "delev_creature_segment", "delevel-creature-segment", "delevel_creature_segment", "delev-segment-creatures", "delev_segment_creatures", "delevel-segment-creatures", "delevel_segment_creatures", "delev-segment-creature", "delev_segment-creature", "delevel-segment-creature", "delevel_segment_creature"],
+        help = "Set level to segment creature subrecords for different delev rules",
+        value_name = "0",
+        value_parser = clap::value_parser!(u16).range(1..)
+    )]
+    pub(super) delev_creatures_segment: Option<u16>,
+    /// Set level to segment item subrecords for different delev rules. See --delev-segment for details.
+    ///
+    /// Default value: 0(disabled).
+    ///
+    /// Requires --delev.
+    #[arg(
+        help_heading = "Delev",
+        requires = "delev",
+        conflicts_with = "settings_write",
+        long,
+        aliases = ["delev_items_segment", "delevel-items-segment", "delevel_items_segment", "delev-item-segment", "delev_item_segment", "delevel-item-segment", "delevel_item_segment", "delev-segment-items", "delev_segment_items", "delevel-segment-items", "delevel_segment_items", "delev-segment-item", "delev_segment-item", "delevel-segment-item", "delevel_segment_item"],
+        help = "Set level to segment item subrecords for different delev rules",
+        value_name = "0",
+        value_parser = clap::value_parser!(u16).range(1..)
+    )]
+    pub(super) delev_items_segment: Option<u16>,
+    /// Make multiple equal delev segments after the first one.
+    ///
+    /// Example: --delev-segment 11 would make following segments(and minimal level to delev to):
+    /// - without --delev-segment-progressive(default):
+    ///     11+ (6)
+    /// - with --delev-segment-progressive:
+    ///     11 - 20 (6)
+    ///     21 - 30 (11)
+    ///     31 - 40 (16)
+    ///     ...
+    ///
+    /// Requires --delev-segment.
+    #[arg(
+        help_heading = "Delev",
+        requires = "delev_segment",
+        conflicts_with = "settings_write",
+        short = 'G',
+        long,
+        aliases = ["delev_segment_progressive", "delevel-segment-progressive", "delevel_segment_progressive", "delev-progressive-segment","delev_progressive_segment", "delevel-progressive-segment", "delevel_progressive_segment"],
+        help = "Make multiple equal delev segments after the first one"
+    )]
+    pub(super) delev_segment_progressive: bool,
+    /// Set minimal level to delev to for the segment via % ratio.
+    ///
+    /// 0% would set the lower bound of the segment as a minimal level to delev to, 100% - the upper. Example is the best way to describe the feature: --delev-segment 11 would make following segments(and --delev-segment-ratio followed by the resulting minimal level to delev to; 3 values of ratio - 0%, 50%, 100%):
+    /// - without --delev-segment-progressive(default):
+    ///     11+ (0% = 1, 50% = 6, 100% = 11)
+    /// - with --delev-segment-progressive:
+    ///     11 - 20 (0% = 1, 50% = 6, 100% = 11)
+    ///     21 - 30 (0% = 1, 50% = 11, 100% = 21)
+    ///     31 - 40 (0% = 1, 50% = 16, 100% = 31)
+    ///     ...
+    ///
+    /// Default value: 50(%).
+    ///
+    /// Requires --delev-segment.
+    #[arg(
+        help_heading = "Delev",
+        requires = "delev_segment",
+        conflicts_with = "settings_write",
+        long,
+        aliases = ["delev_segment_ratio", "delevel-segment-ratio", "delevel_segment_ratio", "delev-ratio-segment","delev_ratio_segment", "delevel-ratio-segment", "delevel_ratio_segment"],
+        help = "Set minimal level to delev to for the segment via % ratio",
+        value_name = "50",
+        value_parser = clap::value_parser!(u8).range(0..101)
+    )]
+    pub(super) delev_segment_ratio: Option<u8>,
     /// Do not delevel creature subrecords.
     ///
-    /// This flag requires --delev. Conflicts with --delev-skip-items.
+    /// Requires --delev. Conflicts with --delev-skip-items.
     #[arg(
         help_heading = "Delev filters",
         requires = "delev",
@@ -454,7 +554,7 @@ pub(super) struct Options {
     pub(super) delev_skip_creatures: bool,
     /// Do not delevel item subrecords.
     ///
-    /// This flag requires --delev. Conflicts with --delev-skip-creatures.
+    /// Requires --delev. Conflicts with --delev-skip-creatures.
     #[arg(
         help_heading = "Delev filters",
         requires = "delev",
@@ -493,7 +593,7 @@ pub(super) struct Options {
     ///
     /// May take either one or multiple comma-separated plugin names, e.g.: "bm_ex_wolfpack"(one), prefix:bm_ex_,suffix:_40(many). Pay attention that there is no space after comma. Use double-quotes around list names with spaces. Case-insensitive. May be used multiple times instead of providing comma-separated list, e.g.: --delev-skip-list prefix:bm_ex_ --delev-skip-list suffix:-40.
     ///
-    /// This flag requires --delev.
+    /// Requires --delev.
     #[arg(
         help_heading = "Delev filters",
         requires = "delev",
@@ -521,7 +621,7 @@ pub(super) struct Options {
     ///
     ///  --delev-skip-list "infix:wolf" --delev-no-skip-list "suffix:09" would skip everything except bm_werewolf_wilderness09
     ///
-    /// This flag requires --delev-skip-list.
+    /// Requires --delev-skip-list.
     #[arg(
         help_heading = "Delev filters",
         requires = "delev_skip_list",
@@ -537,7 +637,7 @@ pub(super) struct Options {
     pub(super) delev_no_skip_list: Option<Vec<String>>,
     /// Do not delevel these subrecords. Works exactly as --delev-skip-list, but filters out subrecords instead of lists.
     ///
-    /// This flag requires --delev.
+    /// Requires --delev.
     #[arg(
         help_heading = "Delev filters",
         requires = "delev",
@@ -553,7 +653,7 @@ pub(super) struct Options {
     pub(super) delev_skip_subrecord: Option<Vec<String>>,
     /// Delevel these lists even if they match --delev-skip-subrecord. Works exactly as --delev-no-skip-list, but filters out subrecords instead of lists.
     ///
-    /// This flag requires --delev-skip-subrecord.
+    /// Requires --delev-skip-subrecord.
     #[arg(
         help_heading = "Delev filters",
         requires = "delev_skip_subrecord",
@@ -570,31 +670,51 @@ pub(super) struct Options {
     /// Do not compare plugins.
     ///
     /// By default output plugin is compared with previous version if there is one(same filename). It's not written if previous version is the same.
+    ///
+    /// Conflicts with all other --compare-* options.
     #[arg(
         help_heading = "Compare",
         conflicts_with = "settings_write",
         long, aliases = ["no_compare", "compare-no", "compare_no"], help = "Do not compare plugins")]
     pub(super) no_compare: bool,
-    /// Plugin to compare output plugin with.
+    /// Do not merge anything, only compare any 2 plugins. Example:
     ///
-    /// This flag allows to compare output plugin with any other plugin. By default output plugin is compared with previous version if there is one(same filename).
+    /// jobasha -C new.esp -W old.esp
     ///
-    /// This flag conflicts with --no-compare.
+    /// Requires --compare-with. Conflicts with --delev-distinct.
     #[arg(
         help_heading = "Compare",
-        conflicts_with_all = ["settings_write", "no_compare"],
+        requires = "compare_with",
+        conflicts_with_all = ["settings_write", "no_compare", "delev_distinct"],
+        short = 'C',
         long,
         value_name = "PATH",
         value_hint = clap::ValueHint::Other,
-        alias = "compare_with",
+        visible_alias = "compare",
+        aliases = ["compare_only", "only-compare", "only_compare"],
+        help = "Do not merge anything, only compare plugins"
+    )]
+    pub(super) compare_only: Option<String>,
+    /// Plugin to compare output plugin with.
+    ///
+    /// This option allows to compare output plugin with any other plugin. By default output plugin is compared with previous version if there is one(same filename).
+    #[arg(
+        help_heading = "Compare",
+        conflicts_with_all = ["settings_write", "no_compare"],
+        short = 'W',
+        long,
+        value_name = "PATH",
+        value_hint = clap::ValueHint::Other,
+        visible_alias = "with",
+        aliases = ["compare_with", "with-compare", "with_compare"],
         help = "Plugin to compare output plugin with"
     )]
     pub(super) compare_with: Option<String>,
     /// Plugin to compare delev output plugin with.
     ///
-    /// This flag allows to compare delev plugin with any other plugin. By default delev plugin is compared with previous version if there is one(same filename).
+    /// This option allows to compare delev plugin with any other plugin. By default delev plugin is compared with previous version if there is one(same filename).
     ///
-    /// This flag requires --delev-distinct. Conflicts with --no-compare.
+    /// Requires --delev-distinct.
     #[arg(
         help_heading = "Compare",
         requires = "delev_distinct",
@@ -606,9 +726,18 @@ pub(super) struct Options {
         help = "Plugin to compare delev output plugin with"
     )]
     pub(super) compare_delev_with: Option<String>,
+    /// Compare common records only. Do not show leveled lists or masters missing from any of plugins that are being compared.
+    #[arg(
+        help_heading = "Compare",
+        conflicts_with_all = ["settings_write", "no_compare"],
+        long,
+        visible_alias = "common",
+        aliases = ["compare_common", "common-compare", "common_compare"],
+        help = "Compare common records only")]
+    pub(super) compare_common: bool,
     /// Show more information. May be provided twice for extra effect.
     ///
-    /// This flag conflicts with --quiet.
+    /// Conflicts with --quiet.
     #[arg(
         help_heading = "Display output",
         conflicts_with_all = ["settings_write", "quiet"],
@@ -620,7 +749,7 @@ pub(super) struct Options {
     pub(super) verbose: u8,
     /// Do not show anything.
     ///
-    /// This flag conflicts with --verbose.
+    /// Conflicts with --verbose.
     #[arg(
         help_heading = "Display output",
         conflicts_with_all = ["settings_write", "verbose"],
@@ -633,7 +762,7 @@ pub(super) struct Options {
     #[arg(
         help_heading = "Display output",
         conflicts_with = "settings_write",
-        short = 'p',
+        short = 'B',
         long,
         alias = "progress",
         help = "Show plugins reading progress"
@@ -641,18 +770,26 @@ pub(super) struct Options {
     pub(super) progress: bool,
     /// Show plugins reading progress bar.
     ///
-    /// This flag implicitly sets --progress.
+    /// This option implicitly sets --progress.
     #[arg(
         help_heading = "Display output",
         conflicts_with = "settings_write",
         short = 'b',
         long,
+        visible_alias = "bar",
         aliases = ["bar", "progress_bar", "bar-progress", "bar_progress"],
         help = "Show plugins reading progress bar"
     )]
     pub(super) progress_bar: bool,
     /// Show colored output.
-    #[arg(help_heading = "Display output", short = 'C', long, alias = "color", help = "Show colored output")]
+    #[arg(
+        help_heading = "Display output",
+        short = 'p',
+        long,
+        visible_alias = "pretty",
+        alias = "color",
+        help = "Show colored output"
+    )]
     pub(super) color: bool,
     /// Do not show summary.
     ///

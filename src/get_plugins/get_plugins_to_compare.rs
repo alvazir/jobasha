@@ -26,7 +26,11 @@ pub(crate) fn get_plugins_to_compare(cfg: &Cfg, log: &mut Log) -> Result<Compare
             get_plugin_to_compare(path, comp, purpose, false, cfg, log)
                 .with_context(|| format!("Failed to load {purpose} plugin: {path:?}"))?;
         }
-        (path, comp, purpose) = (&cfg.output.path, &mut compare_plugins.previous, "previous output");
+        if !cfg.compare_only {
+            (path, comp, purpose) = (&cfg.output.path, &mut compare_plugins.previous, "previous output");
+        } else {
+            (path, comp, purpose) = (&Path::new(&cfg.compare_only_name), &mut compare_plugins.previous, "TODO");
+        }
         get_plugin_to_compare(path, comp, purpose, true, cfg, log)?;
         if cfg.delev && cfg.delev_distinct {
             (path, comp, purpose) = (&cfg.delev_output.path, &mut compare_plugins.delev_previous, "previous delev");

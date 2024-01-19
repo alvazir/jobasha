@@ -1,7 +1,7 @@
 use super::{DeletedSubrecords, DeleveledSubrecords, Helper, UntouchedList};
 use crate::{
-    get_plugin_size, Cfg, ComparePlugins, Creature, DelevSkipPatterns, Item, LastCreature, LastItem, Log, PluginInfo, PluginName,
-    ResponsiblePlugins, Subrecord,
+    get_delev_segment_ceil, get_plugin_size, Cfg, ComparePlugins, Creature, DelevSkipPatterns, Item, LastCreature, LastItem, ListKind,
+    Log, PluginInfo, PluginName, ResponsiblePlugins, Subrecord,
 };
 use anyhow::{anyhow, Result};
 use std::collections::{hash_map::Entry, HashMap};
@@ -45,15 +45,7 @@ macro_rules! make_lists {
 
                 let mut is_delev = false;
                 if $cfg.delev && !$cfg.$name.skip_delev {
-                    let delev_list = delevel_list(
-                        &$name,
-                        &$cfg.$name.delev_to,
-                        &o.id,
-                        &$cfg.$name.log_t,
-                        &o.masters[0],
-                        $cfg,
-                        &mut $h,
-                    );
+                    let delev_list = delevel_list(&$name, &o.id, &$cfg.$name, &o.masters[0], $cfg, &mut $h);
                     if !delev_list.is_empty() {
                         $h.counts.delev.deleveled += 1;
                         if $cfg.delev_distinct {
@@ -279,30 +271,38 @@ fn item_differs(
 
 fn delevel_list<'a>(
     list: &[Subrecord],
-    delev_lvl: &u16,
     id: &str,
-    log_t: &'a str,
+    kind: &'a ListKind,
     plugin_info: &'a PluginInfo,
     cfg: &Cfg,
     h: &mut Helper<'a>,
 ) -> Vec<Subrecord> {
     let mut res = Vec::new();
-    if list.iter().any(|(_, level)| level > delev_lvl) {
+    if list.iter().any(|(_, level)| level > &kind.delev_to) {
         if delev_skip(id, &cfg.delev_skip_list, &cfg.delev_no_skip_list) {
             return res;
         }
         let mut subrecords = Vec::new();
         for (name, level) in list.iter() {
-            if level > delev_lvl && !delev_skip(name, &cfg.delev_skip_subrecord, &cfg.delev_no_skip_subrecord) {
-                res.push((name.clone(), *delev_lvl));
-                subrecords.push(((name.to_lowercase(), *level), *delev_lvl));
+            if level > &kind.delev_to && !delev_skip(name, &cfg.delev_skip_subrecord, &cfg.delev_no_skip_subrecord) {
+                let new_level = if kind.delev_segment > 0 && level >= &kind.delev_segment {
+                    if !cfg.delev_segment_progressive {
+                        kind.delev_segment_ceil
+                    } else {
+                        get_delev_segment_ceil(level, kind.delev_segment, kind.delev_to, cfg.delev_segment_ratio)
+                    }
+                } else {
+                    kind.delev_to
+                };
+                res.push((name.clone(), new_level));
+                subrecords.push(((name.to_lowercase(), *level), new_level));
                 h.counts.delev.deleveled_subrecord += 1;
             } else {
                 res.push((name.clone(), *level));
             }
         }
         h.messages.deleveled_subrecords.push(DeleveledSubrecords {
-            log_t,
+            log_t: &kind.log_t,
             id: id.to_owned(),
             initial_plugin: &plugin_info.name,
             subrecords,

@@ -261,8 +261,11 @@ pub(super) fn get_lists<'a>(
 ) -> Result<(Vec<Creature<'a>>, Vec<Item<'a>>, ReadStats)> {
     let mut creatures: Vec<Creature> = Vec::new();
     let mut items: Vec<Item> = Vec::new();
-    let mut helper = Helper::new(cfg, &plugins[0]);
     let mut stats = ReadStats::default();
+    if cfg.compare_only {
+        return Ok((creatures, items, stats));
+    }
+    let mut helper = Helper::new(cfg, &plugins[0]);
     let plugins_len = plugins.len();
     let mut progress = Progress::new(plugins_len, cfg);
     let mut skipped_plugins: Vec<String> = Vec::new();

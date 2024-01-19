@@ -1,9 +1,11 @@
 use crate::{err_or_ignore, err_or_ignore_thread_safe, msg, read_lines, Cfg, Log, MsgTone};
 use anyhow::{anyhow, Context, Result};
+use dirs::{data_dir, document_dir};
 use fs_err::read_dir;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::{
     collections::{hash_map::Entry, HashMap},
+    fmt::Write as _,
     path::{Path, PathBuf},
 };
 mod get_game_config;
@@ -30,15 +32,20 @@ struct Helper {
     // Make plugins defined in both plugins_skip and plugins_skip_last be skipped once
     preskipped_plugins_number: usize,
     skipped_plugin_numbers: Vec<usize>,
+    skip_default_reasons_processed: bool,
+    skip_default_reasons: HashMap<String, String>,
 }
 
 pub(super) fn get_plugins(cfg: &Cfg, log: &mut Log) -> Result<Vec<PluginInfo>> {
+    let mut res: Vec<PluginInfo> = Vec::new();
+    if cfg.compare_only {
+        return Ok(res);
+    }
     let config_path = get_game_config(cfg, log).with_context(|| "Failed to get game configuration file")?;
     let text = format!("Gathering plugins from game configuration file \"{}\"", &config_path.display());
     msg(text, MsgTone::Neutral, 1, cfg, log)?;
     let config_lines =
         read_lines(&config_path).with_context(|| format!("Failed to read game configuration file \"{}\"", &config_path.display()))?;
-    let mut res: Vec<PluginInfo> = Vec::new();
     let mut helper: Helper = Helper::default();
     let mut omw_data_dirs: Vec<(usize, PathBuf)> = Vec::new();
     let mut omw_all_plugins: HashMap<String, PathBuf> = HashMap::new();
@@ -57,6 +64,8 @@ pub(super) fn get_plugins(cfg: &Cfg, log: &mut Log) -> Result<Vec<PluginInfo>> {
             }
             if line.starts_with(&cfg.guts.omw_line_beginning_content) {
                 if !helper.omw_all_plugins_found {
+                    omw_get_cs_data_dir(&mut omw_data_dirs, &mut helper, cfg, log)
+                        .with_context(|| "Failed to find \"hidden\" OpenMW-CS data directory path")?;
                     omw_all_plugins =
                         get_all_plugins(&omw_data_dirs, &mut helper, cfg).with_context(|| "Failed to find all OpenMW's plugins")?;
                 };
@@ -246,7 +255,17 @@ fn skip_filtered_plugins(raw_name: &str, helper: &mut Helper, cfg: &Cfg, log: &m
             name, cfg.output.name_lowercased_starts_with
         )
     } else if cfg.skip.contains(&name_lowercased) {
-        format!("Plugin \"{}\" will be skipped, because it's listed as a plugin to skip", name)
+        let mut reason = format!("Plugin \"{}\" will be skipped, because it's listed as a plugin to skip", name);
+        // Message should not be displayed when "--all-lists" is specified
+        if !cfg.all_lists {
+            if !helper.skip_default_reasons_processed {
+                process_skip_default_reasons(helper, cfg);
+            }
+            if let Some(reason_tail) = helper.skip_default_reasons.get(&name_lowercased) {
+                write!(reason, "{reason_tail}")?;
+            }
+        }
+        reason
     } else {
         String::new()
     };
@@ -257,6 +276,18 @@ fn skip_filtered_plugins(raw_name: &str, helper: &mut Helper, cfg: &Cfg, log: &m
         msg(&text, MsgTone::Neutral, 0, cfg, log)?;
         Ok(None)
     }
+}
+
+fn process_skip_default_reasons(helper: &mut Helper, cfg: &Cfg) {
+    let separator = "\n  ";
+    for reason in &cfg.guts.skip_default_reasons {
+        if reason.len() > 1 {
+            helper
+                .skip_default_reasons
+                .insert(reason[0].to_lowercase(), format!("{separator}{}", reason[1..].join(separator)));
+        }
+    }
+    helper.skip_default_reasons_processed = true;
 }
 
 fn skip_last_plugins(res: &mut Vec<PluginInfo>, helper: &Helper, cfg: &Cfg, log: &mut Log) -> Result<()> {
@@ -307,4 +338,51 @@ fn error_none_listed(config_path: &Path) -> Result<Vec<PluginInfo>> {
         "None plugins listed in game configuration file: \"{}\"",
         config_path.display()
     ))
+}
+
+fn omw_get_cs_data_dir(omw_data_dirs: &mut Vec<(usize, PathBuf)>, helper: &mut Helper, cfg: &Cfg, log: &mut Log) -> Result<()> {
+    let mut checked_paths: Vec<PathBuf> = Vec::new();
+    macro_rules! check_omw_cs_data_path {
+        ($omw_cs_data_path:expr) => {
+            if $omw_cs_data_path.exists() {
+                omw_data_dirs.push((helper.omw_data_counter, $omw_cs_data_path));
+                helper.omw_data_counter += 1;
+                let text = format!(
+                    "Added \"hidden\" OpenMW-CS data path \"{}\" to the list of directories",
+                    $omw_cs_data_path.display()
+                );
+                return msg(text, MsgTone::Neutral, 0, cfg, log);
+            } else {
+                checked_paths.push($omw_cs_data_path);
+            }
+        };
+    }
+    if let Some(dir) = data_dir() {
+        check_omw_cs_data_path!(dir.join(&cfg.guts.omw_cs_data_path_suffix_linux_macos));
+    } else {
+        checked_paths.push(PathBuf::from(format!(
+            "Failed to get __data_dir__ to check \"__data_dir__/{}\"",
+            &cfg.guts.omw_cs_data_path_suffix_linux_macos
+        )));
+    };
+    if let Some(dir) = document_dir() {
+        check_omw_cs_data_path!(dir.join(&cfg.guts.omw_cs_data_path_suffix_windows));
+    } else {
+        checked_paths.push(PathBuf::from(format!(
+            "Failed to get __document_dir__ to check \"__document_dir__/{}\"",
+            &cfg.guts.omw_cs_data_path_suffix_windows
+        )));
+    };
+    for path in &cfg.guts.omw_cs_data_paths_list {
+        check_omw_cs_data_path!(PathBuf::from(path));
+    }
+    let text = format!(
+        "Failed to find \"hidden\" OpenMW-CS data path. Probably none exists. Checked following paths:\n{}",
+        checked_paths
+            .iter()
+            .map(|path| format!("\t{}", path.display()))
+            .collect::<Vec<String>>()
+            .join("\n")
+    );
+    msg(text, MsgTone::Neutral, 1, cfg, log)
 }

@@ -37,7 +37,7 @@ pub(crate) struct Helper<'a> {
     pub(crate) compare: ComparePlugins,
     pub(crate) counts: ListCounts,
     pub(crate) messages: Messages<'a>,
-    pub(crate) warning: bool,
+    pub(crate) exit_code: i32,
 }
 
 impl<'a> Helper<'a> {
@@ -48,7 +48,7 @@ impl<'a> Helper<'a> {
             compare: plugins_to_compare,
             counts: ListCounts::default(),
             messages: Messages::new(),
-            warning: false,
+            exit_code: 0,
         }
     }
 }

@@ -7,16 +7,22 @@ use std::{
 };
 use tes3::esp::{Header, LeveledCreature, LeveledItem, Plugin, TES3Object};
 
-pub(super) fn compare_plugins(h: &Helper, cfg: &Cfg, log: &mut Log) -> Result<()> {
+pub(super) fn compare_plugins(h: &mut Helper, cfg: &Cfg, log: &mut Log) -> Result<()> {
+    let mut plugins_differ = 0;
     if !cfg.no_compare {
-        let mut new = &h.merge.plugin;
+        let mut new = if !cfg.compare_only {
+            &h.merge.plugin
+        } else {
+            &h.compare.previous.plugin
+        };
         let (mut old, mut old_name) = if cfg.compare_with.is_empty() {
             (&h.compare.previous, "")
         } else {
             (&h.compare.compare_with, cfg.compare_with.as_ref())
         };
         let mut merge_changed = false;
-        compare_plugin(new, old, old_name, &cfg.output, &h.counts, &mut merge_changed, cfg, log)
+        #[rustfmt::skip]
+        compare_plugin(new, old, old_name, &cfg.output, &h.counts, &mut merge_changed, &mut plugins_differ, cfg, log)
             .with_context(|| plugin_compare_failure_msg(&cfg.output.name, old_name))?;
         if cfg.delev && cfg.delev_distinct {
             new = &h.delev.plugin;
@@ -25,8 +31,12 @@ pub(super) fn compare_plugins(h: &Helper, cfg: &Cfg, log: &mut Log) -> Result<()
             } else {
                 (&h.compare.delev_compare_with, cfg.compare_delev_with.as_ref())
             };
-            compare_plugin(new, old, old_name, &cfg.delev_output, &h.counts, &mut merge_changed, cfg, log)
+            #[rustfmt::skip]
+            compare_plugin(new, old, old_name, &cfg.delev_output, &h.counts, &mut merge_changed, &mut plugins_differ, cfg, log)
                 .with_context(|| plugin_compare_failure_msg(&cfg.delev_output.name, old_name))?;
+        }
+        if cfg.compare_only && plugins_differ != 0 {
+            h.exit_code = 3;
         }
     }
     Ok(())
@@ -48,12 +58,13 @@ fn compare_plugin(
     output: &OutputFile,
     counts: &ListCounts,
     merge_changed: &mut bool,
+    plugins_differ: &mut i32,
     cfg: &Cfg,
     log: &mut Log,
 ) -> Result<()> {
     if !old.loaded || is_equal(new_plugin, old, old_name, output, cfg, log)? {
         return Ok(());
-    } else if is_empty(new_plugin, old, old_name, output, counts, cfg, log)? {
+    } else if !cfg.compare_only && is_empty(new_plugin, old, old_name, output, counts, cfg, log)? {
         *merge_changed = true;
         return Ok(());
     }
@@ -72,6 +83,7 @@ fn compare_plugin(
         msg(plugin_compare_msg(&output.name, old_name, true), MsgTone::Good, 0, cfg, log)?;
         Ok(())
     } else {
+        *plugins_differ = 3;
         *merge_changed = true;
         let level = cfg.guts.verboseness_details_compare_plugins;
         msg(plugin_compare_msg(&output.name, old_name, false), MsgTone::Ugly, 0, cfg, log)?;
@@ -185,6 +197,11 @@ fn compare_headers(
     cfg: &Cfg,
 ) -> Result<String> {
     let mut diff = String::new();
+    if new.objects.is_empty() {
+        return Err(anyhow!("Plugin {:?} is empty or invalid", output.name));
+    } else if old.plugin.objects.is_empty() {
+        return Err(anyhow!("Plugin {} is empty or invalid", get_old_name(old_name)));
+    }
     match &new.objects[0] {
         TES3Object::Header(new_header) => match &old.plugin.objects[0] {
             TES3Object::Header(old_header) => {
@@ -216,7 +233,7 @@ fn compare_headers(
                                     writeln!(diff, "{tab}~ MAST {new_name:?} [{old_len} -> {new_len}]")?;
                                 }
                                 headers_set.insert(new_name_low);
-                            } else {
+                            } else if !cfg.compare_common {
                                 writeln!(diff, "{tab}+ MAST {new_name:?}")?;
                             }
                         }
@@ -227,7 +244,7 @@ fn compare_headers(
                                 }
                                 continue;
                             };
-                            if !headers_set.contains(old_name_low) {
+                            if !cfg.compare_common && !headers_set.contains(old_name_low) {
                                 writeln!(diff, "{tab}- MAST {old_name:?}")?;
                             }
                         }
@@ -235,12 +252,7 @@ fn compare_headers(
                 }
             }
             _ => {
-                let name = if old_name.is_empty() {
-                    "previous version".to_string()
-                } else {
-                    format!("{old_name:?}")
-                };
-                return Err(anyhow!("Header is invalid, moved or missing in {name}"));
+                return Err(anyhow!("Header is invalid, moved or missing in {}", get_old_name(old_name)));
             }
         },
         _ => {
@@ -248,6 +260,14 @@ fn compare_headers(
         }
     }
     Ok(diff)
+}
+
+fn get_old_name(old_name: &str) -> String {
+    if old_name.is_empty() {
+        "previous version".to_string()
+    } else {
+        format!("{old_name:?}")
+    }
 }
 
 fn get_masters_from_header(header: &Header) -> Vec<(&String, &u64, String)> {
@@ -333,8 +353,10 @@ fn compare_lists(
     let mut remaining_objects: Vec<(u16, String, &String)> = Vec::new();
     let (mut old_levc, mut old_levi, old_c_count, old_i_count) = get_list_indexes(&old.plugin);
     let (new_levc, new_levi, new_c_count, new_i_count) = get_list_indexes(new);
-    check_multiple_lists_with_same_name(&new_levc, &new_levi, new_c_count, new_i_count, output, cfg, log)
-        .with_context(|| "Failed to check multiple lists with the same name in the output plugin")?;
+    if !cfg.compare_only {
+        check_multiple_lists_with_same_name(&new_levc, &new_levi, new_c_count, new_i_count, output, cfg, log)
+            .with_context(|| "Failed to check multiple lists with the same name in the output plugin")?;
+    }
     macro_rules! compare_lists {
         ($diff:ident, $old_lists:ident, $new_lists:ident, $old_count:ident, $new_count:ident, $kind:ident, $flags:ident, $kind_field:ident, $stat:ident, $short:ident, $name:expr, $acronym:expr) => {
             if $old_lists != $new_lists {
@@ -392,8 +414,9 @@ fn compare_lists(
                                                         writeln!(
                                                             $diff,
                                                             "{tab3}~ {} {:?} [{} -> {}]",
-                                                            $name, old_creature.0, new_level, old_creature.1
+                                                            $name, old_creature.0, old_creature.1, new_level
                                                         )?;
+                                                        // $name, old_creature.0, new_level, old_creature.1
                                                     }
                                                 } else {
                                                     if old_creature.1 != object[0].1 {
@@ -401,8 +424,9 @@ fn compare_lists(
                                                         writeln!(
                                                             $diff,
                                                             "{tab3}~ {} {:?} [{} -> {}]",
-                                                            $name, old_creature.0, object[0].1, old_creature.1
+                                                            $name, old_creature.0, old_creature.1, object[0].1
                                                         )?;
+                                                        // $name, old_creature.0, object[0].1, old_creature.1
                                                     }
                                                     objects.remove(&old_low);
                                                 }
@@ -427,7 +451,9 @@ fn compare_lists(
                         }
                         None => {
                             $stat.added += 1;
-                            writeln!($diff, "{tab2}+ {} {:?}", $acronym, list.id)?;
+                            if !cfg.compare_common {
+                                writeln!($diff, "{tab2}+ {} {:?}", $acronym, list.id)?;
+                            }
                         }
                     }
                 }
@@ -435,7 +461,9 @@ fn compare_lists(
                 old_lists_sorted.sort_by_key(|v| v.0);
                 for (_, (_, list)) in old_lists_sorted.iter() {
                     $stat.removed += 1;
-                    writeln!($diff, "{tab2}- {} {:?}", $acronym, list.id)?;
+                    if !cfg.compare_common {
+                        writeln!($diff, "{tab2}- {} {:?}", $acronym, list.id)?;
+                    }
                 }
                 if !$diff.is_empty() {
                     write!($short, "{tab1}{} leveled lists({}, old -> new):", $name, $acronym)?;

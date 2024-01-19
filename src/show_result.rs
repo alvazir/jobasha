@@ -3,6 +3,9 @@ use anyhow::Result;
 use std::{fmt::Write as _, time::Instant};
 
 pub(super) fn show_result(timer: Instant, read_stats: ReadStats, counts: ListCounts, cfg: &Cfg, log: &mut Log) -> Result<()> {
+    if cfg.compare_only {
+        return Ok(());
+    }
     let mut text = String::with_capacity(512);
     writeln!(
         text,

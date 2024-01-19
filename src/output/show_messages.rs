@@ -3,7 +3,7 @@ use crate::{msg, plural, Cfg, ListCounts, Log, MsgTone};
 use anyhow::{anyhow, Result};
 use std::{cmp::max, fmt::Write as _};
 
-pub(crate) fn show_messages(m: &Messages, counts: &ListCounts, warning: &mut bool, cfg: &Cfg, log: &mut Log) -> Result<()> {
+pub(crate) fn show_messages(m: &Messages, counts: &ListCounts, exit_code: &mut i32, cfg: &Cfg, log: &mut Log) -> Result<()> {
     let mut text = match create_text_with_enough_capacity(m, counts, cfg) {
         Ok(Some(text)) => text,
         Ok(None) => return Ok(()),
@@ -23,7 +23,7 @@ pub(crate) fn show_messages(m: &Messages, counts: &ListCounts, warning: &mut boo
     }
     if !m.threshold_warnings.is_empty() {
         show_threshold_messages(&mut text, &m.threshold_warnings, cfg, log)?;
-        *warning = true;
+        *exit_code = 2;
     }
     if !m.deleveled_subrecords.is_empty() {
         show_deleveled_subrecords(&mut text, &m.deleveled_subrecords, counts.delev.deleveled_subrecord, cfg, log)?;
