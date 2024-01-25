@@ -1,6 +1,6 @@
 [package]
 name = "jobasha"
-version = "0.4.0"
+version = "0.5.0"
 authors = ["alvazir <basha.alvazir@gmail.com>"]
 edition = "2021"
 rust-version = "1.75.0"
@@ -19,7 +19,7 @@ maintenance = { status = "actively-developed" }
 [dependencies.tes3]
 # path = "../tes3"
 git = "https://github.com/Greatness7/tes3"
-rev = "4a08175f"
+rev = "de4b633"
 # branch = "dev"
 default-features = false
 features = ["esp"]

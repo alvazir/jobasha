@@ -3,6 +3,12 @@
 <!-- markdownlint-disable MD036 -->
 # Changelog
 
+## 0.5.0 (TBD)
+
+**Breaking changes**
+
+* Several short option names has been changed(--no-delete, --extended-delete).
+
 ## 0.4.0 (2024-01-19)
 
 **Breaking changes**

@@ -229,7 +229,7 @@ pub(super) struct Options {
     #[arg(
         help_heading = "Subrecord deletion",
         conflicts_with_all = ["settings_write", "extended_delete", "always_delete", "never_delete", "threshold_creatures", "threshold_items", "no_threshold_warnings"],
-        short = 'D',
+        short = 'X',
         long,
         aliases = ["no_delete", "delete-no", "delete_no"],
         help = "Do not delete subrecords from leveled lists"
@@ -243,7 +243,7 @@ pub(super) struct Options {
     #[arg(
         help_heading = "Subrecord deletion",
         conflicts_with_all = ["settings_write", "no_delete"],
-        short,
+        short = 'x',
         long,
         aliases = ["extended_delete", "delete-extended", "delete_extended"],
         help = "Enable extended delete mode"
@@ -411,6 +411,7 @@ pub(super) struct Options {
         help_heading = "Delev",
         requires = "delev",
         conflicts_with_all = ["settings_write"],
+        short = 'D',
         long,
         aliases = ["delev_distinct", "delevel-distinct", "delevel_distinct"],
         help = "Place deleveled lists into the additional output plugin"
