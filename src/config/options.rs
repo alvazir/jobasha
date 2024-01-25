@@ -404,7 +404,7 @@ pub(super) struct Options {
     pub(super) delev_items_to: Option<u16>,
     /// Place deleveled lists into the additional output plugin.
     ///
-    /// Deleveled lists are placed into the output plugin by default. Use this option to separate merged and deleveled lists. By default additional plugin has the same name as the output plugin with added infix " - Delev", e.g. "MergedLeveledLists - Delev.esp". Use --delev-output to set custom name.
+    /// Deleveled lists are placed into the output plugin by default. Use this option to separate merged and deleveled lists. This may be convenient when you use --delev-random. By default additional plugin has the same name as the output plugin with added infix " - Delev", e.g. "MergedLeveledLists - Delev.esp". Use --delev-output to set custom name.
     ///
     /// Requires --delev.
     #[arg(
@@ -435,6 +435,19 @@ pub(super) struct Options {
         help = "Name of the distinct delev output plugin"
     )]
     pub(super) delev_output: Option<String>,
+    /// Delevel to a random value between original and target levels.
+    ///
+    /// Requires --delev.
+    #[arg(
+        help_heading = "Delev",
+        requires = "delev",
+        conflicts_with = "settings_write",
+        short = 'r',
+        long,
+        aliases = ["delev_random", "delevel-random", "delevel_random"],
+        help = "Delevel to a random level between original and target levels",
+    )]
+    pub(super) delev_random: bool,
     /// Set level to segment subrecords for different delev rules.
     ///
     /// Subrecords with level greater or equal to the value will be deleveled according to the following formula:

@@ -9,6 +9,10 @@
 
 * Several short option names has been changed(--no-delete, --extended-delete).
 
+New features
+
+* Add `--delev-random`(short `r`) to delevel to a random level between original and target levels.
+
 ## 0.4.0 (2024-01-19)
 
 **Breaking changes**

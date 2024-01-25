@@ -1,4 +1,5 @@
 use crate::{ComparePlugins, ListCounts, PluginName, ResponsiblePlugins, Subrecord};
+use rand::rngs::ThreadRng;
 use std::collections::HashMap;
 use tes3::esp::{LeveledCreature, LeveledItem, Plugin, TES3Object};
 
@@ -38,6 +39,7 @@ pub(crate) struct Helper<'a> {
     pub(crate) counts: ListCounts,
     pub(crate) messages: Messages<'a>,
     pub(crate) exit_code: i32,
+    pub(crate) rng: ThreadRng,
 }
 
 impl<'a> Helper<'a> {
@@ -49,6 +51,7 @@ impl<'a> Helper<'a> {
             counts: ListCounts::default(),
             messages: Messages::new(),
             exit_code: 0,
+            rng: ThreadRng::default(),
         }
     }
 }

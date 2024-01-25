@@ -87,6 +87,8 @@ pub(super) struct Options {
     /// By default the value is empty so that "guts.delev_output_infix_default" is added to the output plugin name.
     #[config(default = "")]
     pub(super) delev_output: String,
+    #[config(default = false)]
+    pub(super) delev_random: bool,
     /// Following 3 sections are effectively disabled by default with 0 values.
     #[config(default = 0)]
     pub(super) delev_segment: u16,

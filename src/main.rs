@@ -1,5 +1,5 @@
 /*
- *  Jobasha - TES3 leveled list merging and deleveling tool
+ *  Jobasha - TES3 leveled list tool
  *
  *  Copyright (C) 2023 alvazir
  *

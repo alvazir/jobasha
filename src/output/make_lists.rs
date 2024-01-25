@@ -4,6 +4,7 @@ use crate::{
     Log, PluginInfo, PluginName, ResponsiblePlugins, Subrecord,
 };
 use anyhow::{anyhow, Result};
+use rand::Rng;
 use std::collections::{hash_map::Entry, HashMap};
 use tes3::esp::{LeveledCreature, LeveledCreatureFlags, LeveledItem, LeveledItemFlags, ObjectFlags, TES3Object};
 
@@ -285,7 +286,7 @@ fn delevel_list<'a>(
         let mut subrecords = Vec::new();
         for (name, level) in list.iter() {
             if level > &kind.delev_to && !delev_skip(name, &cfg.delev_skip_subrecord, &cfg.delev_no_skip_subrecord) {
-                let new_level = if kind.delev_segment > 0 && level >= &kind.delev_segment {
+                let mut new_level = if kind.delev_segment > 0 && level >= &kind.delev_segment {
                     if !cfg.delev_segment_progressive {
                         kind.delev_segment_ceil
                     } else {
@@ -293,6 +294,9 @@ fn delevel_list<'a>(
                     }
                 } else {
                     kind.delev_to
+                };
+                if cfg.delev_random {
+                    new_level = h.rng.gen_range(new_level..=*level);
                 };
                 res.push((name.clone(), new_level));
                 subrecords.push(((name.to_lowercase(), *level), new_level));

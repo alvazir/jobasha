@@ -125,9 +125,9 @@ checksum = "7f30e7476521f6f8af1a1c4c0b8cc94f0bee37d91763d0ca2665f299b6cd8aec"
 
 [[package]]
 name = "bytemuck"
-version = "1.14.0"
+version = "1.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "374d28ec25809ee0e23827c2ab573d729e293f281dfe393500e7ad618baa61c6"
+checksum = "ed2490600f404f2b94c167e31d3ed1d5f3c225a0f3b80230053b3e0b7b962bd9"
 dependencies = [
  "bytemuck_derive",
 ]
@@ -146,7 +146,7 @@ dependencies = [
 [[package]]
 name = "bytes_io"
 version = "0.0.1"
-source = "git+https://github.com/Greatness7/tes3?rev=4a08175f#4a08175fcec75ce61c4d317a5d7da9c142d9044a"
+source = "git+https://github.com/Greatness7/tes3?rev=de4b633#de4b6331f3ee2daf327e8a8d2e7ec50a683a962f"
 dependencies = [
  "bstr",
  "bytemuck",
@@ -160,7 +160,7 @@ dependencies = [
 [[package]]
 name = "bytes_io_macros"
 version = "0.0.1"
-source = "git+https://github.com/Greatness7/tes3?rev=4a08175f#4a08175fcec75ce61c4d317a5d7da9c142d9044a"
+source = "git+https://github.com/Greatness7/tes3?rev=de4b633#de4b6331f3ee2daf327e8a8d2e7ec50a683a962f"
 dependencies = [
  "quote",
  "syn 2.0.48",
@@ -183,16 +183,16 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "chrono"
-version = "0.4.31"
+version = "0.4.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f2c685bad3eb3d45a01354cedb7d5faa66194d1d58ba6e267a8de788f79db38"
+checksum = "9f13690e35a5e4ace198e7beea2895d29f3a9cc55015fcebe6336bd2010af9eb"
 dependencies = [
  "android-tzdata",
  "iana-time-zone",
  "js-sys",
  "num-traits",
  "wasm-bindgen",
- "windows-targets 0.48.5",
+ "windows-targets 0.52.0",
 ]
 
 [[package]]
@@ -389,7 +389,7 @@ dependencies = [
 [[package]]
 name = "esp"
 version = "0.0.1"
-source = "git+https://github.com/Greatness7/tes3?rev=4a08175f#4a08175fcec75ce61c4d317a5d7da9c142d9044a"
+source = "git+https://github.com/Greatness7/tes3?rev=de4b633#de4b6331f3ee2daf327e8a8d2e7ec50a683a962f"
 dependencies = [
  "bitflags 2.4.2",
  "bstr",
@@ -407,7 +407,7 @@ dependencies = [
 [[package]]
 name = "esp_macros"
 version = "0.0.1"
-source = "git+https://github.com/Greatness7/tes3?rev=4a08175f#4a08175fcec75ce61c4d317a5d7da9c142d9044a"
+source = "git+https://github.com/Greatness7/tes3?rev=de4b633#de4b6331f3ee2daf327e8a8d2e7ec50a683a962f"
 dependencies = [
  "quote",
  "syn 2.0.48",
@@ -512,7 +512,7 @@ checksum = "b1a46d1a171d865aa5f83f92695765caa047a9b4cbae2cbf37dbd613a793fd4c"
 
 [[package]]
 name = "jobasha"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -522,6 +522,7 @@ dependencies = [
  "dirs",
  "fs-err",
  "indicatif",
+ "rand",
  "rayon",
  "serde",
  "tes3",
@@ -611,10 +612,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7170ef9988bc169ba16dd36a7fa041e5c4cbeb6a35b76d4c03daded371eae7c0"
 
 [[package]]
-name = "proc-macro2"
-version = "1.0.76"
+name = "ppv-lite86"
+version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95fc56cda0b5c3325f5fbbd7ff9fda9e02bb00bb3dac51252d2f1bfa1cb8cc8c"
+checksum = "5b40af805b3121feab8a3c29f04d8ad262fa8e0561883e7653e024ae4479e6de"
+
+[[package]]
+name = "proc-macro2"
+version = "1.0.78"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2422ad645d89c99f8f3e6b88a9fdeca7fabeac836b1002371c4367c8f984aae"
 dependencies = [
  "unicode-ident",
 ]
@@ -626,6 +633,36 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "291ec9ab5efd934aaf503a6466c5d5251535d108ee747472c3977cc5acc868ef"
 dependencies = [
  "proc-macro2",
+]
+
+[[package]]
+name = "rand"
+version = "0.8.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "34af8d1a0e25924bc5b7c43c079c942339d8f0a8b57c39049bef581b46327404"
+dependencies = [
+ "libc",
+ "rand_chacha",
+ "rand_core",
+]
+
+[[package]]
+name = "rand_chacha"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6c10a63a0fa32252be49d21e7709d4d4baf8d231c2dbce1eaa8141b9b127d88"
+dependencies = [
+ "ppv-lite86",
+ "rand_core",
+]
+
+[[package]]
+name = "rand_core"
+version = "0.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
+dependencies = [
+ "getrandom",
 ]
 
 [[package]]
@@ -768,7 +805,7 @@ dependencies = [
 [[package]]
 name = "tes3"
 version = "0.0.1"
-source = "git+https://github.com/Greatness7/tes3?rev=4a08175f#4a08175fcec75ce61c4d317a5d7da9c142d9044a"
+source = "git+https://github.com/Greatness7/tes3?rev=de4b633#de4b6331f3ee2daf327e8a8d2e7ec50a683a962f"
 dependencies = [
  "esp",
 ]

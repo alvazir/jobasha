@@ -44,7 +44,9 @@ console = "~0.15.8"
 # progress bar
 indicatif = "~0.17.7"
 # get date to put into result's name
-chrono = "~0.4.31"
+chrono = "~0.4.33"
+# delev to random level
+rand = "~0.8.5"
 # memory usage
 # peak_alloc = "~0.2.0" # disabled due to slowing down the program
 
