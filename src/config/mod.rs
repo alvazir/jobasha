@@ -458,6 +458,44 @@ impl Cfg {
         }
         Ok(())
     }
+
+    pub(super) fn show_log_path(&self, log: &mut Log) -> Result<()> {
+        if self.no_log {
+            Ok(())
+        } else {
+            let log_path = match &self.log {
+                None => return Err(anyhow!("Failed to show log path because it's empty")),
+                Some(log_path) => log_path,
+            };
+            msg(format!("Log is written to \"{}\"", log_path.display()), MsgTone::Good, 0, self, log)
+        }
+    }
+
+    pub(super) fn show_settings_written(&self, log: &mut Log) -> Result<()> {
+        let mut text = String::with_capacity(self.guts.long_message_string_inital_capacity);
+        if self.settings_file.backup_written {
+            text.push_str(&format!(
+                "Previous settings file was renamed to \"{}\"{}",
+                self.settings_file.backup_path.display(),
+                if self.settings_file.backup_overwritten {
+                    ", previous backup was overwritten"
+                } else {
+                    ""
+                },
+            ));
+            msg(text, MsgTone::Warm, 0, self, log)?;
+        }
+        text = format!("Wrote default program settings into \"{}\"", self.settings_file.path.display());
+        msg(text, MsgTone::Good, 0, self, log)
+    }
+
+    pub(super) fn show_settings_version_message(&self, log: &mut Log) -> Result<()> {
+        if let Some(message) = &self.settings_file.version_message {
+            msg(message, MsgTone::Bad, 0, self, log)
+        } else {
+            Ok(())
+        }
+    }
 }
 
 pub(super) fn get_self_config() -> Result<Cfg> {

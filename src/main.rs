@@ -33,8 +33,7 @@ use output::process_output;
 use show_result::show_result;
 use util::{
     create_dir_early, err_or_ignore, err_or_ignore_thread_safe, get_delev_segment_ceil, get_plugin_size, msg, plural, read_lines,
-    show_log_path, show_settings_version_message, show_settings_written, ComparePlugin, ComparePlugins, ListCounts, Log, MsgTone,
-    Progress,
+    ComparePlugin, ComparePlugins, ListCounts, Log, MsgTone, Progress,
 };
 
 // #[global_allocator]
@@ -61,12 +60,12 @@ fn run() -> Result<i32> {
     let timer = Instant::now();
     let cfg = get_self_config()?;
     let mut log = Log::new(&cfg)?;
-    show_log_path(&cfg, &mut log)?;
+    cfg.show_log_path(&mut log)?;
     if cfg.settings_file.write {
-        show_settings_written(&cfg, &mut log)?;
+        cfg.show_settings_written(&mut log)?;
         return Ok(0);
     }
-    show_settings_version_message(&cfg, &mut log)?;
+    cfg.show_settings_version_message(&mut log)?;
     cfg.show_configuration(&mut log)?;
     let plugins_to_compare = get_plugins_to_compare(&cfg, &mut log).with_context(|| "Failed to get plugins for comparison")?;
     let plugins = get_plugins(&cfg, &mut log).with_context(|| "Failed to get plugins")?;

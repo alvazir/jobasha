@@ -236,36 +236,6 @@ impl Log {
     }
 }
 
-pub(super) fn show_log_path(cfg: &Cfg, log: &mut Log) -> Result<()> {
-    if cfg.no_log {
-        Ok(())
-    } else {
-        let log_path = match &cfg.log {
-            None => return Err(anyhow!("Failed to show log path because it's empty")),
-            Some(log_path) => log_path,
-        };
-        msg(format!("Log is written to \"{}\"", log_path.display()), MsgTone::Good, 0, cfg, log)
-    }
-}
-
-pub(super) fn show_settings_written(cfg: &Cfg, log: &mut Log) -> Result<()> {
-    let mut text = String::with_capacity(cfg.guts.long_message_string_inital_capacity);
-    if cfg.settings_file.backup_written {
-        text.push_str(&format!(
-            "Previous settings file was renamed to \"{}\"{}",
-            cfg.settings_file.backup_path.display(),
-            if cfg.settings_file.backup_overwritten {
-                ", previous backup was overwritten"
-            } else {
-                ""
-            },
-        ));
-        msg(text, MsgTone::Warm, 0, cfg, log)?;
-    }
-    text = format!("Wrote default program settings into \"{}\"", cfg.settings_file.path.display());
-    msg(text, MsgTone::Good, 0, cfg, log)
-}
-
 pub(super) fn create_dir_early(path: &Path, name: &str) -> Result<()> {
     match path.parent() {
         None => {}
@@ -318,14 +288,6 @@ pub(super) fn plural(word: &str, count: usize) -> Result<&str> {
 pub(super) fn read_lines(filename: &Path) -> Result<io::Lines<io::BufReader<File>>> {
     let file = File::open(filename).with_context(|| format!("Failed to open file \"{}\"", filename.display()))?;
     Ok(io::BufReader::new(file).lines())
-}
-
-pub(super) fn show_settings_version_message(cfg: &Cfg, log: &mut Log) -> Result<()> {
-    if let Some(message) = &cfg.settings_file.version_message {
-        msg(message, MsgTone::Bad, 0, cfg, log)
-    } else {
-        Ok(())
-    }
 }
 
 fn backup_log_file(log_file: &PathBuf, backup_suffix: &str, no_backup: bool) -> String {
