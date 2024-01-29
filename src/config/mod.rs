@@ -1,9 +1,13 @@
-use crate::create_dir_early;
+use crate::{create_dir_early, msg, Log, MsgTone};
 use anyhow::{anyhow, Context, Result};
 use confique::toml::{template, FormatOptions};
 use console::Style;
 use fs_err::write;
-use std::{ffi::OsString, path::PathBuf};
+use std::{
+    ffi::OsString,
+    fmt::{Arguments, Write as _},
+    path::PathBuf,
+};
 mod options;
 mod settings;
 mod util;
@@ -13,6 +17,7 @@ use util::{
     append_default_to_skip, backup_settings_file, check_settings_version, check_verboseness, get_color, get_compare_only,
     get_delev_to, get_exe_name_and_dir, get_kind_delev_segment, get_kind_delev_to, get_log_file, get_output_file,
     get_progress_frequency, get_settings_file, prepare_delev_skip_patterns, prepare_plugin_extensions_to_ignore,
+    show_configuration_add_header,
 };
 
 pub(crate) struct Cfg {
@@ -143,45 +148,129 @@ pub(crate) struct Guts {
     pub(crate) verboseness_details_threshold_warnings: u8,
     pub(crate) verboseness_details_deleveled_subrecords: u8,
     pub(crate) verboseness_details_compare_plugins: u8,
+    pub(crate) verboseness_show_configuration: u8,
     pub(crate) compare_tab_l1: String,
     pub(crate) compare_tab_l2: String,
     pub(crate) compare_tab_l3: String,
+    pub(crate) show_configuration: ShowConfiguration,
+}
+
+pub(crate) struct ShowConfiguration {
+    pub(crate) cmd: String,
+    pub(crate) opt: String,
+    pub(crate) set: String,
+}
+
+impl ShowConfiguration {
+    fn new(capacity: usize) -> Result<ShowConfiguration> {
+        let cmd = if std::env::args_os().len() == 0 {
+            String::new()
+        } else {
+            let mut cmd = String::with_capacity(capacity);
+            write!(cmd, "  Command-line arguments:\n    ")?;
+            for (position, arg) in std::env::args_os().enumerate() {
+                if position == 0 {
+                    write!(cmd, "{:?}", arg.to_string_lossy())?;
+                } else {
+                    write!(cmd, ",{:?}", arg.to_string_lossy())?;
+                }
+            }
+            cmd
+        };
+        Ok(ShowConfiguration {
+            cmd,
+            opt: String::with_capacity(capacity),
+            set: String::with_capacity(capacity),
+        })
+    }
+
+    fn add_bool(&mut self, opt: bool, name: &'static str) -> Result<()> {
+        let string = if opt { &mut self.opt } else { &mut self.set };
+        show_configuration_add_header(opt, string)?;
+        write!(string, "\n    {} = true", name)?;
+        Ok(())
+    }
+
+    fn add_some(&mut self, opt: bool, name: &'static str, format_args: Arguments<'_>) -> Result<()> {
+        let string = if opt { &mut self.opt } else { &mut self.set };
+        show_configuration_add_header(opt, string)?;
+        write!(string, "\n    {} = {format_args}", name)?;
+        Ok(())
+    }
 }
 
 impl Cfg {
     fn new(opt: Options, set: Settings, settings_file: SettingsFile, exe: Option<String>, dir: Option<PathBuf>) -> Result<Cfg> {
+        let mut show_configuration = ShowConfiguration::new(128)?;
         macro_rules! opt_or_set_bool {
             ($name:ident) => {
                 match opt.$name {
-                    true => opt.$name,
-                    false => set.options.$name,
+                    true => {
+                        show_configuration.add_bool(true, stringify!($name))?;
+                        opt.$name
+                    }
+                    false => {
+                        if set.options.$name {
+                            show_configuration.add_bool(false, stringify!($name))?;
+                        };
+                        set.options.$name
+                    }
                 }
             };
         }
         macro_rules! opt_or_set_some {
-            ($name:ident) => {
+            ($name:ident, $default:expr) => {
                 match opt.$name {
-                    Some(value) => value,
-                    None => set.options.$name,
+                    Some(value) => {
+                        show_configuration.add_some(true, stringify!($name), format_args!("{:?}", value))?;
+                        value
+                    }
+                    None => {
+                        if set.options.$name != $default {
+                            show_configuration.add_some(false, stringify!($name), format_args!("{:?}", &set.options.$name))?;
+                        }
+                        set.options.$name
+                    }
                 }
             };
         }
         macro_rules! opt_or_set_vec_lowercase {
-            ($name:ident) => {
+            ($name:ident, $default:expr) => {
                 match opt.$name {
-                    Some(value) => value.iter().map(|x| x.to_lowercase()).collect(),
-                    None => set.options.$name.iter().map(|x| x.to_lowercase()).collect(),
+                    Some(value) => {
+                        show_configuration.add_some(true, stringify!($name), format_args!("{:?}", value))?;
+                        value.iter().map(|x| x.to_lowercase()).collect()
+                    }
+                    None => {
+                        if &set.options.$name[..] != &$default[..] {
+                            show_configuration.add_some(false, stringify!($name), format_args!("{:?}", &set.options.$name))?;
+                        }
+                        set.options.$name.iter().map(|x| x.to_lowercase()).collect()
+                    }
                 }
             };
         }
         macro_rules! opt_or_set_threshold {
-            ($name_ident:ident, $name_string:expr) => {
+            ($name_ident:ident, $name_string:expr, $default:expr) => {
                 match opt.$name_ident {
-                    Some(num) => num as f64,
-                    None => match set.options.$name_ident <= 100 {
-                        true => set.options.$name_ident as f64,
-                        false => return Err(anyhow!(format!("Value of {} should be in range 0-100", $name_string))),
-                    },
+                    Some(num) => {
+                        show_configuration.add_some(true, stringify!($name_ident), format_args!("{:?}", num))?;
+                        num as f64
+                    }
+                    None => {
+                        if set.options.$name_ident != $default {
+                            show_configuration.add_some(false, stringify!($name), format_args!("{:?}", &set.options.$name_ident))?;
+                        }
+                        match set.options.$name_ident <= 100 {
+                            true => set.options.$name_ident as f64,
+                            false => {
+                                return Err(anyhow!(format!(
+                                    "Value of {} should be in range 0-100",
+                                    set.options.$name_ident
+                                )))
+                            }
+                        }
+                    }
                 }
             };
         }
@@ -196,49 +285,49 @@ impl Cfg {
             };
         }
         let no_log = opt_or_set_bool!(no_log);
-        let delev_to = get_delev_to(opt_or_set_some!(delev_to))?;
-        let delev_creatures_to = get_kind_delev_to(delev_to, opt_or_set_some!(delev_creatures_to));
-        let delev_items_to = get_kind_delev_to(delev_to, opt_or_set_some!(delev_items_to));
-        let delev_segment = opt_or_set_some!(delev_segment);
-        let delev_segment_ratio = opt_or_set_threshold!(delev_segment_ratio, "delev_segment_ratio");
+        let delev_to = get_delev_to(opt_or_set_some!(delev_to, 1))?;
+        let delev_creatures_to = get_kind_delev_to(delev_to, opt_or_set_some!(delev_creatures_to, 0));
+        let delev_items_to = get_kind_delev_to(delev_to, opt_or_set_some!(delev_items_to, 0));
+        let delev_segment = opt_or_set_some!(delev_segment, 0);
+        let delev_segment_ratio = opt_or_set_threshold!(delev_segment_ratio, "delev_segment_ratio", 50);
         let (creatures_delev_segment, creatures_delev_segment_ceil) = get_kind_delev_segment(
             "Creatures",
             delev_creatures_to,
             delev_segment_ratio,
             delev_segment,
-            opt_or_set_some!(delev_creatures_segment),
+            opt_or_set_some!(delev_creatures_segment, 0),
         )?;
         let (items_delev_segment, items_delev_segment_ceil) = get_kind_delev_segment(
             "Items",
             delev_items_to,
             delev_segment_ratio,
             delev_segment,
-            opt_or_set_some!(delev_items_segment),
+            opt_or_set_some!(delev_items_segment, 0),
         )?;
         let no_skip_default = opt_or_set_bool!(no_skip_default);
-        let (compare_only, compare_only_name) = get_compare_only(&opt.compare_only);
+        let (compare_only, compare_only_name) = get_compare_only(&opt.compare_only, &mut show_configuration)?;
         Ok(Cfg {
-            output: get_output_file(&opt, &set, PluginKind::Merge, &compare_only_name)?,
-            delev_output: get_output_file(&opt, &set, PluginKind::Delev, "")?,
-            config: opt_or_set_some!(config),
+            output: get_output_file(&opt, &set, PluginKind::Merge, &compare_only_name, &mut show_configuration)?,
+            delev_output: get_output_file(&opt, &set, PluginKind::Delev, "", &mut show_configuration)?,
+            config: opt_or_set_some!(config, ""),
             dry_run: opt_or_set_bool!(dry_run),
             no_log,
-            log: get_log_file(no_log, opt_or_set_some!(log), exe, dir)?,
+            log: get_log_file(no_log, opt_or_set_some!(log, ""), exe, dir)?,
             settings_file,
             no_backup: opt_or_set_bool!(no_backup),
             ignore_errors: opt_or_set_bool!(ignore_errors),
             all_lists: opt_or_set_bool!(all_lists),
-            skip_last: opt_or_set_some!(skip_last),
+            skip_last: opt_or_set_some!(skip_last, 0),
             skip: if no_skip_default {
-                opt_or_set_vec_lowercase!(skip)
+                opt_or_set_vec_lowercase!(skip, Vec::<String>::new())
             } else {
-                append_default_to_skip(opt_or_set_vec_lowercase!(skip), &set.guts.skip_default)
+                append_default_to_skip(opt_or_set_vec_lowercase!(skip, Vec::<String>::new()), &set.guts.skip_default)
             },
             skip_unexpected_tags: opt_or_set_bool!(skip_unexpected_tags),
             no_skip_unexpected_tags_default: opt_or_set_bool!(no_skip_unexpected_tags_default),
             creatures: ListKind {
                 skip: opt_or_set_bool!(skip_creatures),
-                threshold: opt_or_set_threshold!(threshold_creatures, "threshold_creatures"),
+                threshold: opt_or_set_threshold!(threshold_creatures, "threshold_creatures", 67),
                 log_t: set.guts.log_t_creature,
                 skip_delev: opt_or_set_bool!(delev_skip_creatures),
                 delev_to: delev_creatures_to,
@@ -247,7 +336,7 @@ impl Cfg {
             },
             items: ListKind {
                 skip: opt_or_set_bool!(skip_items),
-                threshold: opt_or_set_threshold!(threshold_items, "threshold_items"),
+                threshold: opt_or_set_threshold!(threshold_items, "threshold_items", 49),
                 log_t: set.guts.log_t_item,
                 skip_delev: opt_or_set_bool!(delev_skip_items),
                 delev_to: delev_items_to,
@@ -256,27 +345,37 @@ impl Cfg {
             },
             no_delete: opt_or_set_bool!(no_delete),
             extended_delete: opt_or_set_bool!(extended_delete),
-            always_delete: opt_or_set_vec_lowercase!(always_delete),
-            never_delete: opt_or_set_vec_lowercase!(never_delete),
+            always_delete: opt_or_set_vec_lowercase!(
+                always_delete,
+                ["Morrowind.esm", "Tribunal.esm", "Bloodmoon.esm", "Tamriel_Data.esm"]
+            ),
+            never_delete: opt_or_set_vec_lowercase!(never_delete, ["Wares-base.esm", "abotWaterLife.esm", "RepopulatedMorrowind.ESM"]),
             no_threshold_warnings: opt_or_set_bool!(no_threshold_warnings),
             delev: opt_or_set_bool!(delev),
             delev_distinct: opt_or_set_bool!(delev_distinct),
             delev_random: opt_or_set_bool!(delev_random),
             delev_segment_progressive: opt_or_set_bool!(delev_segment_progressive),
             delev_segment_ratio,
-            delev_skip_list: prepare_delev_skip_patterns(opt_or_set_vec_lowercase!(delev_skip_list)),
-            delev_no_skip_list: prepare_delev_skip_patterns(opt_or_set_vec_lowercase!(delev_no_skip_list)),
-            delev_skip_subrecord: prepare_delev_skip_patterns(opt_or_set_vec_lowercase!(delev_skip_subrecord)),
-            delev_no_skip_subrecord: prepare_delev_skip_patterns(opt_or_set_vec_lowercase!(delev_no_skip_subrecord)),
+            delev_skip_list: prepare_delev_skip_patterns(opt_or_set_vec_lowercase!(delev_skip_list, Vec::<String>::new())),
+            delev_no_skip_list: prepare_delev_skip_patterns(opt_or_set_vec_lowercase!(delev_no_skip_list, Vec::<String>::new())),
+            delev_skip_subrecord: prepare_delev_skip_patterns(opt_or_set_vec_lowercase!(delev_skip_subrecord, Vec::<String>::new())),
+            delev_no_skip_subrecord: prepare_delev_skip_patterns(opt_or_set_vec_lowercase!(
+                delev_no_skip_subrecord,
+                Vec::<String>::new()
+            )),
             no_compare: opt_or_set_bool!(no_compare),
             compare_only,
             compare_only_name,
-            compare_with: opt_or_set_some!(compare_with),
-            compare_delev_with: opt_or_set_some!(compare_delev_with),
+            compare_with: opt_or_set_some!(compare_with, ""),
+            compare_delev_with: opt_or_set_some!(compare_delev_with, ""),
             compare_common: opt_or_set_bool!(compare_common),
             verbose: if opt.verbose == 0 {
+                if set.options.verbose != 0 {
+                    show_configuration.add_some(false, "verbose", format_args!("{:?}", &set.options.verbose))?;
+                }
                 get_verbose!(set.options.verbose)
             } else {
+                show_configuration.add_some(true, "verbose", format_args!("{:?}", &opt.verbose))?;
                 get_verbose!(opt.verbose)
             },
             quiet: opt_or_set_bool!(quiet),
@@ -329,11 +428,32 @@ impl Cfg {
                 verboseness_details_threshold_warnings: get_verbose!(set.guts.verboseness_details_threshold_warnings),
                 verboseness_details_deleveled_subrecords: get_verbose!(set.guts.verboseness_details_deleveled_subrecords),
                 verboseness_details_compare_plugins: get_verbose!(set.guts.verboseness_details_compare_plugins),
+                verboseness_show_configuration: get_verbose!(set.guts.verboseness_show_configuration),
                 compare_tab_l1: set.guts.compare_tab_l1,
                 compare_tab_l2: set.guts.compare_tab_l2,
                 compare_tab_l3: set.guts.compare_tab_l3,
+                show_configuration,
             },
         })
+    }
+
+    pub(super) fn show_configuration(&self, log: &mut Log) -> Result<()> {
+        let show_cfg = &self.guts.show_configuration;
+        if !(show_cfg.cmd.is_empty() && show_cfg.opt.is_empty() && show_cfg.set.is_empty()) {
+            let verbosity = self.guts.verboseness_show_configuration;
+            let text = "\nProgram run with the following configuration:";
+            msg(text, MsgTone::Neutral, verbosity, self, log)?;
+            macro_rules! show_cfg {
+                ($($field:ident),+) => {
+                    $(if !show_cfg.$field.is_empty() {
+                        msg(&show_cfg.$field, MsgTone::Neutral, verbosity, self, log)?;
+                    })+
+                }
+            }
+            show_cfg!(cmd, opt, set);
+            msg(String::new(), MsgTone::Neutral, verbosity, self, log)?;
+        }
+        Ok(())
     }
 }
 

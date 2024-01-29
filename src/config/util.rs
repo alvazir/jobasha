@@ -1,4 +1,4 @@
-use super::{DelevSkipPatterns, Options, OutputFile, PluginKind, Settings, SettingsFile};
+use super::{DelevSkipPatterns, Options, OutputFile, PluginKind, Settings, SettingsFile, ShowConfiguration};
 use crate::{get_delev_segment_ceil, read_lines};
 use anyhow::{anyhow, Context, Result};
 use chrono::Local;
@@ -6,6 +6,7 @@ use console::Style;
 use fs_err::rename;
 use std::{
     env::current_exe,
+    fmt::Write as _,
     path::{Path, PathBuf},
 };
 
@@ -135,19 +136,35 @@ pub(super) fn get_progress_frequency(frequency: u8) -> Result<u8> {
     }
 }
 
-pub(super) fn get_output_file(opt: &Options, set: &Settings, kind: PluginKind, compare_only_name: &str) -> Result<OutputFile> {
+pub(super) fn get_output_file(
+    opt: &Options,
+    set: &Settings,
+    kind: PluginKind,
+    compare_only_name: &str,
+    show_configuration: &mut ShowConfiguration,
+) -> Result<OutputFile> {
     macro_rules! name_parse_error {
         ($name:ident, $part:expr) => {
             return Err(anyhow!("Failed to parse {} from output plugin name: \"{}\"", $part, $name,))
         };
     }
-    let (opt_output, set_options_output) = match kind {
-        PluginKind::Merge => (&opt.output, &set.options.output),
-        PluginKind::Delev => (&opt.delev_output, &set.options.delev_output),
+    let (opt_output, set_options_output, option_name) = match kind {
+        PluginKind::Merge => (&opt.output, &set.options.output, "output"),
+        PluginKind::Delev => (&opt.delev_output, &set.options.delev_output, "delev_output"),
     };
     let mut raw_path = match opt_output {
-        Some(name) => name,
-        None => set_options_output,
+        Some(name) => {
+            show_configuration.add_some(true, option_name, format_args!("{:?}", &name))?;
+            name
+        }
+        None => {
+            if (matches!(kind, PluginKind::Merge) && set_options_output != "MergedLeveledLists.esp")
+                || (matches!(kind, PluginKind::Delev) && !set_options_output.is_empty())
+            {
+                show_configuration.add_some(false, option_name, format_args!("{:?}", &set_options_output))?;
+            }
+            set_options_output
+        }
     };
     let mut path = PathBuf::from(&raw_path);
     if raw_path.is_empty() && matches!(kind, PluginKind::Delev) {
@@ -166,9 +183,19 @@ pub(super) fn get_output_file(opt: &Options, set: &Settings, kind: PluginKind, c
         ));
     };
     let dir_path = match &opt.output_dir {
-        Some(path) => PathBuf::from(&path),
+        Some(path) => {
+            if matches!(kind, PluginKind::Merge) {
+                show_configuration.add_some(true, "output_dir", format_args!("{:?}", &path))?;
+            }
+            PathBuf::from(&path)
+        }
         None => match &set.options.output_dir.is_empty() {
-            false => PathBuf::from(&set.options.output_dir),
+            false => {
+                if matches!(kind, PluginKind::Merge) {
+                    show_configuration.add_some(false, "output_dir", format_args!("{:?}", &set.options.output_dir))?;
+                }
+                PathBuf::from(&set.options.output_dir)
+            }
             true => match path.parent() {
                 Some(path) => PathBuf::from(path),
                 None => name_parse_error!(raw_path, "directory path"),
@@ -339,9 +366,23 @@ pub(super) fn prepare_delev_skip_patterns(raw_patterns: Vec<String>) -> DelevSki
     }
 }
 
-pub(super) fn get_compare_only(compare_only: &Option<String>) -> (bool, String) {
+pub(super) fn get_compare_only(compare_only: &Option<String>, show_configuration: &mut ShowConfiguration) -> Result<(bool, String)> {
     match compare_only {
-        None => (false, String::new()),
-        Some(value) => (true, value.to_owned()),
+        None => Ok((false, String::new())),
+        Some(value) => {
+            show_configuration.add_some(true, "compare_only", format_args!("{:?}", value))?;
+            Ok((true, value.to_owned()))
+        }
     }
+}
+
+pub(super) fn show_configuration_add_header(opt: bool, string: &mut String) -> Result<()> {
+    if string.is_empty() {
+        let text = match opt {
+            true => "Options:",
+            false => "Settings:",
+        };
+        write!(string, "  {text}",)?;
+    }
+    Ok(())
 }

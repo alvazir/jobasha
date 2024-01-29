@@ -304,6 +304,8 @@ pub(super) struct Guts {
     pub(super) verboseness_details_deleveled_subrecords: u8,
     #[config(default = 1)]
     pub(super) verboseness_details_compare_plugins: u8,
+    #[config(default = 4)]
+    pub(super) verboseness_show_configuration: u8,
     #[config(default = "  ")]
     pub(super) compare_tab_l1: String,
     #[config(default = "    ")]

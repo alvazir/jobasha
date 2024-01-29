@@ -67,6 +67,7 @@ fn run() -> Result<i32> {
         return Ok(0);
     }
     show_settings_version_message(&cfg, &mut log)?;
+    cfg.show_configuration(&mut log)?;
     let plugins_to_compare = get_plugins_to_compare(&cfg, &mut log).with_context(|| "Failed to get plugins for comparison")?;
     let plugins = get_plugins(&cfg, &mut log).with_context(|| "Failed to get plugins")?;
     let (creatures, items, record_read_stats) = get_lists(&plugins, &cfg, &mut log).with_context(|| "Failed to get leveled lists")?;
