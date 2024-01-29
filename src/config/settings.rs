@@ -317,6 +317,8 @@ pub(super) struct Guts {
     pub(super) log_t_creature: String,
     #[config(default = "I")]
     pub(super) log_t_item: String,
+    #[config(default = 128)]
+    pub(super) long_message_string_inital_capacity: usize,
 }
 
 pub(super) fn get_settings(settings_file: &mut SettingsFile) -> Result<Settings> {

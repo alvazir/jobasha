@@ -249,7 +249,7 @@ pub(super) fn show_log_path(cfg: &Cfg, log: &mut Log) -> Result<()> {
 }
 
 pub(super) fn show_settings_written(cfg: &Cfg, log: &mut Log) -> Result<()> {
-    let mut text = String::with_capacity(128);
+    let mut text = String::with_capacity(cfg.guts.long_message_string_inital_capacity);
     if cfg.settings_file.backup_written {
         text.push_str(&format!(
             "Previous settings file was renamed to \"{}\"{}",

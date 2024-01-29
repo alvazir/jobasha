@@ -153,6 +153,7 @@ pub(crate) struct Guts {
     pub(crate) compare_tab_l2: String,
     pub(crate) compare_tab_l3: String,
     pub(crate) show_configuration: ShowConfiguration,
+    pub(crate) long_message_string_inital_capacity: usize,
 }
 
 pub(crate) struct ShowConfiguration {
@@ -201,7 +202,8 @@ impl ShowConfiguration {
 
 impl Cfg {
     fn new(opt: Options, set: Settings, settings_file: SettingsFile, exe: Option<String>, dir: Option<PathBuf>) -> Result<Cfg> {
-        let mut show_configuration = ShowConfiguration::new(128)?;
+        let long_message_string_inital_capacity = set.guts.long_message_string_inital_capacity;
+        let mut show_configuration = ShowConfiguration::new(long_message_string_inital_capacity)?;
         macro_rules! opt_or_set_bool {
             ($name:ident) => {
                 match opt.$name {
@@ -433,6 +435,7 @@ impl Cfg {
                 compare_tab_l2: set.guts.compare_tab_l2,
                 compare_tab_l3: set.guts.compare_tab_l3,
                 show_configuration,
+                long_message_string_inital_capacity,
             },
         })
     }

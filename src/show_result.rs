@@ -6,7 +6,7 @@ pub(super) fn show_result(timer: Instant, read_stats: ReadStats, counts: ListCou
     if cfg.compare_only {
         return Ok(());
     }
-    let mut text = String::with_capacity(512);
+    let mut text = String::with_capacity(cfg.guts.long_message_string_inital_capacity * 4);
     writeln!(
         text,
         "Performance: {:.3}s duration, {} plugin{}({} record{}) read at {:.0}/s({:.0}/s)",
