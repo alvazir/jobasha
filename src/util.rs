@@ -308,7 +308,7 @@ pub(super) fn plural(word: &str, count: usize) -> Result<&str> {
         "s" => if_plural!(word, ""),
         "were" => if_plural!(word, "was"),
         "have" => if_plural!(word, "has"),
-        "is" => if_plural!(word, "are"),
+        "are" => if_plural!(word, "is"),
         "these" => if_plural!(word, "this"),
         _ => return Err(anyhow!("Bug: Failed to match plural word")),
     };

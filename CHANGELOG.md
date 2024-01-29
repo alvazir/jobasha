@@ -13,6 +13,10 @@ New features
 
 * Add `--delev-random`(short `r`) to delevel to a random level between original and target levels.
 
+Fixes
+
+* Fix formatting and bug in threshold messages output.
+
 Miscellaneous
 
 * Add program run configuration output to log file(or to display with very verbose output -vvvv), showing used command-line arguments, non-default options and settings.

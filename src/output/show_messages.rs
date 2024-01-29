@@ -111,8 +111,9 @@ fn show_threshold_messages(text: &mut String, list: &ThresholdMessages, cfg: &Cf
         ThresholdMessageKind::Resolved => {
             write!(
                 text,
-                "{} leveled list{} automatically excluded from subrecord deletion mode",
+                "{} leveled list{} {} automatically excluded from subrecord deletion mode",
                 list.messages.len(),
+                plural("s", list.messages.len())?,
                 plural("were", list.messages.len())?,
             )?;
             msg_with_details_suggestion(text, MsgTone::Good, max(0, warnings_off), details, cfg, log)?;
