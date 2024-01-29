@@ -148,7 +148,7 @@ pub(super) struct Guts {
     /// Guts of the program. Use at your own risk ;-)
     ///
     /// # Following line is used to determine version of used settings to warn about outdated version:
-    /// # Settings version: 0.4.0
+    /// # Settings version: 0.5.0
     ///
     /// [Colors]
     /// Available colors are: blue, cyan, green, magenta, red, yellow, none.
