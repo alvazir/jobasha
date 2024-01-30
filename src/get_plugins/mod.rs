@@ -279,7 +279,7 @@ fn skip_filtered_plugins(raw_name: &str, helper: &mut Helper, cfg: &Cfg, log: &m
 }
 
 fn process_skip_default_reasons(helper: &mut Helper, cfg: &Cfg) {
-    let separator = "\n  ";
+    let separator = ":\n  ";
     for reason in &cfg.guts.skip_default_reasons {
         if reason.len() > 1 {
             helper

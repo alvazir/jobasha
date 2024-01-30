@@ -168,7 +168,7 @@ pub(super) struct Options {
         value_delimiter = ','
     )]
     pub(super) skip: Option<Vec<String>>,
-    /// Do not skip plugins defined by default: "Merged Objects.esp"(TES3Merge) and "merged.omwaddon"(Delta).
+    /// Do not skip plugins defined by default: "Merged Objects.esp"(TES3Merge), "merged.omwaddon"(Delta) and "multipatch.esp"(tes3cmd).
     #[arg(
         help_heading = "Filters",
         conflicts_with = "settings_write",

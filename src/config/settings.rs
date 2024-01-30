@@ -202,12 +202,13 @@ pub(super) struct Guts {
     #[config(default = ["omwscripts"])]
     pub(super) plugin_extensions_to_ignore: Vec<String>,
     /// Following plugins are skipped unless --no-skip-default is set.
-    #[config(default = ["Merged Objects.esp", "merged.omwaddon"])]
+    #[config(default = ["Merged Objects.esp", "merged.omwaddon", "multipatch.esp"])]
     pub(super) skip_default: Vec<String>,
     /// Reason to display when skipping these plugins unless --all-lists is specified.
     #[config(default = [
         ["Merged Objects.esp", "This plugin was probably created by TES3Merge. Add \"--all-lists\" to override leveled lists in it.\n  Or set \"LEVC = false\" and \"LEVI = false\" in TES3Merge.ini."],
         ["merged.omwaddon", "This plugin was probably created by DeltaPlugin. Add \"--all-lists\" to override leveled lists in it."],
+        ["multipatch.esp", "This plugin was probably created by tes3cmd. Add \"--all-lists\" to override leveled lists in it."],
     ])]
     pub(super) skip_default_reasons: Vec<Vec<String>>,
     /// Plugins with the following record types are skipped unless --no-skip-unexpected-tags-default is set.
