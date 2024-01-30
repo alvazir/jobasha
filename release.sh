@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
-release_folder="Jobasha"
-release_zip="Jobasha.zip"
+binary="jobasha"
+folder="Jobasha"
+docs="${folder}/Docs"
+zip="Jobasha.zip"
 
 build() {
 set -x
+cargo build || return 1
 cargo build --profile release-lto --target x86_64-unknown-linux-gnu || return 1
 cargo build --profile release-lto --target x86_64-unknown-linux-musl || return 1
 cargo ndk -t arm64-v8a build --profile release-lto || return 1
@@ -16,40 +19,46 @@ set +x
 
 zip() (
 
-  if [ -d "${release_folder}" ]; then
-    echo "${release_folder} exists"
+  if [ -d "${folder}" ]; then
+    echo "${folder} exists"
     return 1
   fi
-  if [ -f "${release_zip}" ]; then
-    rm -v "${release_zip}" || return 1
+  if [ -f "${zip}" ]; then
+    rm -v "${zip}" || return 1
   fi
-  mkdir -pv "${release_folder}/linux_x86-64" || return 1
-  cp    -vt "${release_folder}/linux_x86-64"\
-    "target/x86_64-unknown-linux-gnu/release-lto/jobasha" || return 1
-  mkdir -pv "${release_folder}/linux_x86-64_musl" || return 1
-  cp    -vt "${release_folder}/linux_x86-64_musl"\
-    "target/x86_64-unknown-linux-musl/release-lto/jobasha" || return 1
-  mkdir -pv "${release_folder}/android_aarch64" || return 1
-  cp    -vt "${release_folder}/android_aarch64"\
-    "target/aarch64-linux-android/release-lto/jobasha" || return 1
-  mkdir -pv "${release_folder}/windows_x86-64_msvc" || return 1
-  cp    -vt "${release_folder}/windows_x86-64_msvc"\
-    "target/x86_64-pc-windows-msvc/release-lto/jobasha.exe" || return 1
-  mkdir -pv "${release_folder}/windows_x86-64_gnu" || return 1
-  cp    -vt "${release_folder}/windows_x86-64_gnu"\
-    "target/x86_64-pc-windows-gnu/release-lto/jobasha.exe" || return 1
-  mkdir -pv "${release_folder}/macos_x86-64" || return 1
-  cp    -vt "${release_folder}/macos_x86-64"\
-    "target/x86_64-apple-darwin/release-lto-darwin/jobasha" || return 1
-  mkdir -pv "${release_folder}/macos_aarch64" || return 1
-  cp    -vt "${release_folder}/macos_aarch64"\
-    "target/aarch64-apple-darwin/release-lto-darwin/jobasha" || return 1
+  mkdir -pv "${folder}/linux_x86-64" || return 1
+  cp    -vt "${folder}/linux_x86-64"\
+    "target/x86_64-unknown-linux-gnu/release-lto/${binary}" || return 1
+  mkdir -pv "${folder}/linux_x86-64_musl" || return 1
+  cp    -vt "${folder}/linux_x86-64_musl"\
+    "target/x86_64-unknown-linux-musl/release-lto/${binary}" || return 1
+  mkdir -pv "${folder}/android_aarch64" || return 1
+  cp    -vt "${folder}/android_aarch64"\
+    "target/aarch64-linux-android/release-lto/${binary}" || return 1
+  mkdir -pv "${folder}/windows_x86-64_msvc" || return 1
+  cp    -vt "${folder}/windows_x86-64_msvc"\
+    "target/x86_64-pc-windows-msvc/release-lto/${binary}.exe" || return 1
+  mkdir -pv "${folder}/windows_x86-64_gnu" || return 1
+  cp    -vt "${folder}/windows_x86-64_gnu"\
+    "target/x86_64-pc-windows-gnu/release-lto/${binary}.exe" || return 1
+  mkdir -pv "${folder}/macos_x86-64" || return 1
+  cp    -vt "${folder}/macos_x86-64"\
+    "target/x86_64-apple-darwin/release-lto-darwin/${binary}" || return 1
+  mkdir -pv "${folder}/macos_aarch64" || return 1
+  cp    -vt "${folder}/macos_aarch64"\
+    "target/aarch64-apple-darwin/release-lto-darwin/${binary}" || return 1
+  mkdir -pv "${docs}" || return 1
+  set -x
+  ./target/debug/${binary} -h 2> "${docs}/help_brief.txt"
+  ./target/debug/${binary} --help 2> "${docs}/help_extended.txt"
+  ./target/debug/${binary} --no-log --settings-write --settings "${docs}/${binary}.toml"
+  set +x
 
-  7z a "${release_zip}" "${release_folder}" -tzip || return 1
-  7z t "${release_zip}" || return 1
-  7z l "${release_zip}" || return 1
-  md5sum "${release_zip}" || return 1
-  rm -r "${release_folder}" || return 1
+  7z a "${zip}" "${folder}" -tzip || return 1
+  7z t "${zip}" || return 1
+  7z l "${zip}" || return 1
+  md5sum "${zip}" || return 1
+  rm -r "${folder}" || return 1
 )
 
 main() {

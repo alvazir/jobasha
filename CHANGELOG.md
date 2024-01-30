@@ -3,7 +3,7 @@
 <!-- markdownlint-disable MD036 -->
 # Changelog
 
-## 0.5.0 (TBD)
+## 0.5.0 (2024-01-30)
 
 **Breaking changes**
 
@@ -12,8 +12,8 @@
 New features
 
 * Add `--delev-random`(short `r`) to delevel to a random level between original and target levels.
-* Make program halt at the end and wait for keypress when run without arguments. That's primarily done to prevent terminal window immediately closing when run in Windows with double-click(thanks to Walkihr for feedback).
 * Skip multipatch.esp(tes3cmd) by default(optional).
+* Make program halt at the end and wait for keypress when run without arguments. That's primarily done to prevent terminal window immediately closing when run in Windows by double-click(thanks to Walkihr for feedback).
 
 Fixes
 
@@ -21,6 +21,7 @@ Fixes
 
 Miscellaneous
 
+* Add `Docs` folder to release with settings(jobasha.toml) and help files(help_brief.txt, help_extended.txt). That's to be used when program is run in Windows by double-click(thanks to Walkihr for feedback).
 * Print suggestion to add `--all-lists` when multipatch.esp is skipped.
 * Add program run configuration output to log file(or to display with very verbose output -vvvv), showing used command-line arguments, non-default options and settings.
 

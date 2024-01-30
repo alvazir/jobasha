@@ -47,9 +47,9 @@ Jobasha will perfectly organize all your lists in his library. It is a [command 
 
   ```text
   Jobasha - TES3 leveled list tool
-  
+
   Usage: jobasha [OPTIONS]
-  
+
   Options:
     -c, --config <PATH>         Path to the game configuration file
     -o, --output <PATH>         Name of the output plugin
@@ -65,7 +65,7 @@ Jobasha will perfectly organize all your lists in his library. It is a [command 
     -?, --help-option <OPTION>  Print help for the specific option
     -h, --help                  Print help (see more with '--help')
     -V, --version               Print version
-  
+
   Filters:
     -a, --all-lists                        Place all leveled lists into the output plugin
     -k, --skip-last <0>                    Do not process last <N> plugins
@@ -75,29 +75,30 @@ Jobasha will perfectly organize all your lists in his library. It is a [command 
         --no-skip-unexpected-tags-default  Do not skip plugins that contain known unexpected record types
         --skip-creatures                   Do not process creature leveled lists
         --skip-items                       Do not process item leveled lists
-  
+
   Subrecord deletion:
-    -D, --no-delete                  Do not delete subrecords from leveled lists
-    -e, --extended-delete            Enable extended delete mode
+    -X, --no-delete                  Do not delete subrecords from leveled lists
+    -x, --extended-delete            Enable extended delete mode
     -A, --always-delete <PLUGIN(S)>  List of plugins to delete subrecords
     -N, --never-delete <PLUGIN(S)>   Do not delete subrecords from these plugins
         --threshold-creatures <67>   Threshold for % of deleted/initial creatures per list
         --threshold-items <49>       Threshold for % of deleted/initial items per list
     -T, --no-threshold-warnings      Do not show threshold warnings
-  
+
   Delev:
     -d, --delev                        Delevel subrecords mode
     -t, --delev-to <1>                 Set level to delevel subrecords to
         --delev-creatures-to <LVL>     Set level to delevel creature subrecords to
         --delev-items-to <LVL>         Set level to delevel item subrecords to
-        --delev-distinct               Place deleveled lists into the additional output plugin
+    -D, --delev-distinct               Place deleveled lists into the additional output plugin
         --delev-output <PATH>          Name of the distinct delev output plugin
+    -r, --delev-random                 Delevel to a random level between original and target levels
     -g, --delev-segment <0>            Set level to segment subrecords for different delev rules
         --delev-creatures-segment <0>  Set level to segment creature subrecords for different delev rules
         --delev-items-segment <0>      Set level to segment item subrecords for different delev rules
     -G, --delev-segment-progressive    Make multiple equal delev segments after the first one
         --delev-segment-ratio <50>     Set minimal level to delev to for the segment via % ratio
-  
+
   Delev filters:
         --delev-skip-creatures                    Do not delevel creature subrecords
     -I, --delev-skip-items                        Do not delevel item subrecords
@@ -105,21 +106,23 @@ Jobasha will perfectly organize all your lists in his library. It is a [command 
         --delev-no-skip-list <LIST(S)>            Delevel these lists even if they match --delev-skip-list
         --delev-skip-subrecord <SUBRECORD(S)>     Do not delevel these subrecords
         --delev-no-skip-subrecord <SUBRECORD(S)>  Delevel these subrecords even if they match --delev-skip-subrecord
-  
+
   Compare:
         --no-compare                 Do not compare plugins
     -C, --compare-only <PATH>        Do not merge anything, only compare plugins [aliases: compare]
     -W, --compare-with <PATH>        Plugin to compare output plugin with [aliases: with]
         --compare-delev-with <PATH>  Plugin to compare delev output plugin with
         --compare-common             Compare common records only [aliases: common]
-  
+
   Display output:
-    -v, --verbose...    Show more information
-    -q, --quiet         Do not show anything
-    -B, --progress      Show plugins reading progress
-    -b, --progress-bar  Show plugins reading progress bar [aliases: bar]
-    -p, --color         Show colored output [aliases: pretty]
-    -S, --no-summary    Do not show summary
+    -v, --verbose...              Show more information
+    -q, --quiet                   Do not show anything
+    -B, --progress                Show plugins reading progress
+    -b, --progress-bar            Show plugins reading progress bar [aliases: bar]
+    -p, --color                   Show colored output [aliases: pretty]
+    -y, --no-press-enter-to-exit  Do not pause at the end
+    -Y, --press-enter-to-exit     Pause at the end with "Press enter to exit..."
+    -S, --no-summary              Do not show summary
 
   ```
 
