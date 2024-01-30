@@ -12,6 +12,7 @@
 New features
 
 * Add `--delev-random`(short `r`) to delevel to a random level between original and target levels.
+* Make program halt at the end and wait for keypress when run without arguments. That's primarily done to prevent terminal window immediately closing when run in Windows with double-click(thanks to Walkihr for feedback).
 
 Fixes
 

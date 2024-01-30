@@ -4,8 +4,10 @@ use confique::toml::{template, FormatOptions};
 use console::Style;
 use fs_err::write;
 use std::{
+    env::args_os,
     ffi::OsString,
     fmt::{Arguments, Write as _},
+    io::stdin,
     path::PathBuf,
 };
 mod options;
@@ -62,6 +64,8 @@ pub(crate) struct Cfg {
     pub(crate) progress: bool,
     pub(crate) progress_bar: bool,
     pub(crate) color: bool,
+    pub(crate) no_press_enter_to_exit: bool,
+    pub(crate) press_enter_to_exit: bool,
     pub(crate) no_summary: bool,
     pub(crate) guts: Guts,
 }
@@ -157,6 +161,7 @@ pub(crate) struct Guts {
 }
 
 pub(crate) struct ShowConfiguration {
+    pub(crate) cmd_len: usize,
     pub(crate) cmd: String,
     pub(crate) opt: String,
     pub(crate) set: String,
@@ -164,12 +169,14 @@ pub(crate) struct ShowConfiguration {
 
 impl ShowConfiguration {
     fn new(capacity: usize) -> Result<ShowConfiguration> {
-        let cmd = if std::env::args_os().len() == 0 {
+        let args = args_os();
+        let cmd_len = args.len();
+        let cmd = if cmd_len == 0 {
             String::new()
         } else {
             let mut cmd = String::with_capacity(capacity);
             write!(cmd, "  Command-line arguments:\n    ")?;
-            for (position, arg) in std::env::args_os().enumerate() {
+            for (position, arg) in args.enumerate() {
                 if position == 0 {
                     write!(cmd, "{:?}", arg.to_string_lossy())?;
                 } else {
@@ -179,6 +186,7 @@ impl ShowConfiguration {
             cmd
         };
         Ok(ShowConfiguration {
+            cmd_len,
             cmd,
             opt: String::with_capacity(capacity),
             set: String::with_capacity(capacity),
@@ -384,6 +392,8 @@ impl Cfg {
             progress: opt_or_set_bool!(progress) || opt_or_set_bool!(progress_bar),
             progress_bar: opt_or_set_bool!(progress_bar),
             color: opt_or_set_bool!(color),
+            no_press_enter_to_exit: opt_or_set_bool!(no_press_enter_to_exit),
+            press_enter_to_exit: opt_or_set_bool!(press_enter_to_exit),
             no_summary: opt_or_set_bool!(no_summary),
             guts: Guts {
                 color_suggestion: get_color(&set.guts.color_suggestion)?,
@@ -495,6 +505,15 @@ impl Cfg {
         } else {
             Ok(())
         }
+    }
+
+    pub(super) fn press_enter_to_exit(&self, log: &mut Log) -> Result<()> {
+        if !self.quiet && ((!self.no_press_enter_to_exit && self.guts.show_configuration.cmd_len <= 1) || self.press_enter_to_exit) {
+            msg("Press enter to exit...", MsgTone::Neutral, 0, self, log)?;
+            let mut buffer = String::new();
+            stdin().read_line(&mut buffer).with_context(|| "Failed to read input")?;
+        }
+        Ok(())
     }
 }
 

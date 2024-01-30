@@ -140,6 +140,10 @@ pub(super) struct Options {
     #[config(default = false)]
     pub(super) color: bool,
     #[config(default = false)]
+    pub(super) no_press_enter_to_exit: bool,
+    #[config(default = false)]
+    pub(super) press_enter_to_exit: bool,
+    #[config(default = false)]
     pub(super) no_summary: bool,
 }
 

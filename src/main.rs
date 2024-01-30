@@ -73,5 +73,6 @@ fn run() -> Result<i32> {
     let (counts, exit_code) =
         process_output(creatures, items, plugins_to_compare, &cfg, &mut log).with_context(|| "Failed to process leveled lists")?;
     show_result(timer, record_read_stats, counts, &cfg, &mut log)?;
+    cfg.press_enter_to_exit(&mut log)?;
     Ok(exit_code)
 }

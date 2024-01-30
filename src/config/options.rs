@@ -805,6 +805,30 @@ pub(super) struct Options {
         help = "Show colored output"
     )]
     pub(super) color: bool,
+    /// Do not pause at the end with \"Press enter to exit...\".
+    ///
+    /// By default program halts at the end only when run without arguments.
+    #[arg(
+        help_heading = "Display output",
+        conflicts_with_all = ["settings_write", "press_enter_to_exit"],
+        short = 'y',
+        long,
+        alias = "no_press_enter_to_exit",
+        help = "Do not pause at the end"
+    )]
+    pub(super) no_press_enter_to_exit: bool,
+    /// Always pause at the end with \"Press enter to exit...\". Option --quiet overrides it though.
+    ///
+    /// By default program halts at the end only when run without arguments.
+    #[arg(
+        help_heading = "Display output",
+        conflicts_with_all = ["settings_write", "no_press_enter_to_exit"],
+        short = 'Y',
+        long,
+        alias = "press_enter_to_exit",
+        help = "Pause at the end with \"Press enter to exit...\""
+    )]
+    pub(super) press_enter_to_exit: bool,
     /// Do not show summary.
     ///
     /// Summary's field names are mostly self explanatory though not all:
