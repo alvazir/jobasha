@@ -20,22 +20,36 @@
 use anyhow::{Context, Result};
 use std::{process::exit, time::Instant};
 mod config;
-mod get_lists;
 mod get_plugins;
+mod input;
+mod leveled_lists;
+mod merge;
 mod output;
 mod show_result;
 mod util;
 use config::{get_self_config, Cfg, DelevSkipPatterns, ListKind, OutputFile, PluginKind};
-use get_lists::{get_lists, Creature, Item, LastCreature, LastItem, PluginName, ReadStats, ResponsiblePlugins, Subrecord};
 use get_plugins::{get_plugins, get_plugins_to_compare, PluginInfo};
+use input::{
+    get_records,
+    merge::{
+        BirthsignRecordMap, CellKey, CellRecordMap, ContainerRecordMap, CreatureRecordMap, IntermediateRecords, Merge, NpcRecordMap,
+        RaceRecordMap, RecordMap,
+    },
+    structs::{InputHelper, PluginName, ReadStats, ResponsiblePlugins},
+};
+use leveled_lists::{
+    messages::LlMessages,
+    records::{LlCreatureRecords, LlElement, LlItemRecords},
+};
+use merge::{merge_records, RawPlugins};
 use output::process_output;
-// use peak_alloc::PeakAlloc; // slows down the program too much
 use show_result::show_result;
 use util::{
-    create_dir_early, err_or_ignore, err_or_ignore_thread_safe, get_delev_segment_ceil, get_plugin_size, msg, plural, read_lines,
-    ComparePlugin, ComparePlugins, ListCounts, Log, MsgTone, Progress,
+    append_for_details_or_check_log, create_dir_early, err_or_ignore, err_or_ignore_thread_safe, get_delev_segment_ceil,
+    get_plugin_size, msg, msg_thread_safe, plural, read_lines, ComparePlugin, ComparePlugins, ListCounts, Log, MsgTone, Progress,
 };
 
+// use peak_alloc::PeakAlloc; // slows down the program too much
 // #[global_allocator]
 // static PEAK_ALLOC: PeakAlloc = PeakAlloc; // slows down the program too much
 
@@ -67,11 +81,15 @@ fn run() -> Result<i32> {
     }
     cfg.show_settings_version_message(&mut log)?;
     cfg.show_configuration(&mut log)?;
+    // cfg.show_merge_types(&mut log)?;
     let plugins_to_compare = get_plugins_to_compare(&cfg, &mut log).with_context(|| "Failed to get plugins for comparison")?;
     let plugins = get_plugins(&cfg, &mut log).with_context(|| "Failed to get plugins")?;
-    let (creatures, items, record_read_stats) = get_lists(&plugins, &cfg, &mut log).with_context(|| "Failed to get leveled lists")?;
-    let (counts, exit_code) =
-        process_output(creatures, items, plugins_to_compare, &cfg, &mut log).with_context(|| "Failed to process leveled lists")?;
+    let (ll_creatures, ll_items, intermediate_records, record_read_stats) =
+        get_records(&plugins, &cfg, &mut log).with_context(|| "Failed to get records")?;
+    let (raw_plugins, mut counts, mut exit_code) =
+        merge_records(ll_creatures, ll_items, intermediate_records, &cfg, &mut log).with_context(|| "Failed to merge records")?;
+    process_output(plugins_to_compare, raw_plugins, &mut counts, &mut exit_code, &cfg, &mut log)
+        .with_context(|| "Failed to process output")?;
     show_result(timer, record_read_stats, counts, &cfg, &mut log)?;
     cfg.press_enter_to_exit(&mut log)?;
     Ok(exit_code)

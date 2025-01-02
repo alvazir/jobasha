@@ -50,6 +50,9 @@ pub(super) fn get_settings_file(exe: &Option<String>, dir: &Option<PathBuf>, opt
             }
         },
     };
+    if !options.settings_write && options.settings.is_some() && !settings_file_path.exists() {
+        return Err(anyhow!("Settings file \"{}\" not found", settings_file_path.display()));
+    }
     let settings_file = SettingsFile {
         path: settings_file_path,
         version_message: None,
@@ -133,6 +136,13 @@ pub(super) fn get_progress_frequency(frequency: u8) -> Result<u8> {
     match frequency {
         f if f > 0 && f <= 10 => Ok(frequency),
         _ => Err(anyhow!("Progress frequency must be between 1 and 10 Hz")),
+    }
+}
+
+pub(super) fn get_interior_grid_change(level: u8, equal_to_the_last: u8) -> Result<u8> {
+    match level {
+        f if f <= equal_to_the_last => Ok(level),
+        _ => Err(anyhow!("Setting \"guts.debug_level_merge_interior_grid_change\"({level}) should be less or equal to \"guts.debug_level_merge_skipped_equal_to_the_last\"({equal_to_the_last})")),
     }
 }
 
@@ -287,17 +297,25 @@ pub(super) fn get_kind_delev_segment(
     Ok((segment, ceil))
 }
 
-pub(super) fn check_verboseness(verboseness: u8, name: &str) -> Result<u8> {
-    let verboseness_limit = 10;
-    match verboseness {
-        f if f <= verboseness_limit => Ok(verboseness),
-        _ => match name {
-            "opt.verbose" => Err(anyhow!("Verbose argument should be passed no more than {verboseness_limit} times")),
-            _ => Err(anyhow!(
-                "Verboseness \"{}\" should be less than or equal to {verboseness_limit}",
-                name
-            )),
-        },
+pub(super) fn get_fogbug_fixed_value(fog: f32) -> Result<f32> {
+    if fog <= 0.0 {
+        Err(anyhow!("Fog value to fix fogbug should be larger than 0"))
+    } else {
+        Ok(fog)
+    }
+}
+
+pub(super) fn check_verboseness(level: u8, name: &str) -> Result<u8> {
+    let limit = 10;
+    match level {
+        f if f <= limit => Ok(level),
+        _ => {
+            if let Some(suffix) = name.strip_prefix("opt.") {
+                Err(anyhow!("Option \"{suffix}\" should be passed no more than {limit} times"))
+            } else {
+                Err(anyhow!("Option \"{}\"[{level}] should be less than or equal to {limit}", name))
+            }
+        }
     }
 }
 
@@ -318,19 +336,32 @@ pub(super) fn append_default_to_skip(mut skip: Vec<String>, default: &[String]) 
 
 pub(super) fn check_settings_version(settings_file: &mut SettingsFile) -> Result<()> {
     if settings_file.path.exists() {
-        let settings_toml_lines = read_lines(&settings_file.path)
-            .with_context(|| format!("Failed to read program configuration file \"{}\"", &settings_file.path.display()))?;
-        let settings_version_prefix = "# # Settings version: ";
-        let expected_settings_version = String::from("0.5.0");
-        let mut detected_settings_version = String::from("0.1.0");
-        for line in settings_toml_lines.flatten() {
-            if line.starts_with(settings_version_prefix) {
-                let version_raw = &line.strip_prefix(settings_version_prefix);
-                if let Some(version_raw) = version_raw {
-                    detected_settings_version = version_raw.trim().to_owned();
-                    break;
+        let expected_settings_version = String::from("0.6.0");
+        let mut detected_settings_version = String::new();
+        macro_rules! find_version {
+            ($prefix:expr) => {
+                for line in read_lines(&settings_file.path)
+                    .with_context(|| {
+                        format!(
+                            "Failed to read program configuration file \"{}\"",
+                            &settings_file.path.display()
+                        )
+                    })?
+                    .map_while(Result::ok)
+                {
+                    if line.starts_with($prefix) {
+                        let version_raw = &line.strip_prefix($prefix);
+                        if let Some(version_raw) = version_raw {
+                            detected_settings_version = version_raw.trim().replace('"', "").to_owned();
+                            break;
+                        }
+                    }
                 }
-            }
+            };
+        }
+        find_version!("#settings_version = ");
+        if detected_settings_version.is_empty() {
+            find_version!("# # Settings version: ");
         }
         if detected_settings_version != expected_settings_version {
             settings_file.version_message =  Some(

@@ -3,6 +3,7 @@ use anyhow::{anyhow, Context, Result};
 use fs_err::{create_dir_all, rename, File};
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use std::{
+    fmt::Write as _,
     io::{self, BufRead, BufWriter, Write},
     path::{Path, PathBuf},
     time::Instant,
@@ -97,6 +98,21 @@ macro_rules! msg {
     };
 }
 
+macro_rules! error_with_suggestion {
+    ($text:ident, $cfg:ident) => {
+        Err(anyhow!(format!(
+            "{}{}{}",
+            $text.as_ref(),
+            if $cfg.guts.suffix_add_ignore_errors_suggestion.is_empty() {
+                ""
+            } else {
+                "\n"
+            },
+            $cfg.guts.suffix_add_ignore_errors_suggestion
+        )))
+    };
+}
+
 pub(crate) fn msg<S: AsRef<str>>(text: S, tone: MsgTone, verbose: u8, cfg: &Cfg, log: &mut Log) -> Result<()> {
     if !cfg.no_log {
         log.write(&text).with_context(|| "Failed to write to log file buffer")?;
@@ -105,7 +121,7 @@ pub(crate) fn msg<S: AsRef<str>>(text: S, tone: MsgTone, verbose: u8, cfg: &Cfg,
     Ok(())
 }
 
-fn msg_thread_safe<S: AsRef<str>>(text: S, tone: MsgTone, verbose: u8, cfg: &Cfg) -> Result<()> {
+pub(super) fn msg_thread_safe<S: AsRef<str>>(text: S, tone: MsgTone, verbose: u8, cfg: &Cfg) -> Result<()> {
     msg!(text, tone, verbose, cfg);
     Ok(())
 }
@@ -120,11 +136,7 @@ pub(crate) fn err_or_ignore<S: AsRef<str>>(text: S, cfg: &Cfg, log: &mut Log) ->
             log,
         )
     } else {
-        Err(anyhow!(format!(
-            "{}{}",
-            text.as_ref(),
-            cfg.guts.suffix_add_ignore_errors_suggestion
-        )))
+        error_with_suggestion!(text, cfg)
     }
 }
 
@@ -137,11 +149,7 @@ pub(crate) fn err_or_ignore_thread_safe<S: AsRef<str>>(text: S, cfg: &Cfg) -> Re
             cfg,
         )
     } else {
-        Err(anyhow!(format!(
-            "{}{}",
-            text.as_ref(),
-            cfg.guts.suffix_add_ignore_errors_suggestion
-        )))
+        error_with_suggestion!(text, cfg)
     }
 }
 
@@ -306,4 +314,19 @@ fn backup_log_file(log_file: &PathBuf, backup_suffix: &str, no_backup: bool) -> 
 
 pub(crate) fn get_delev_segment_ceil(level: &u16, delev_segment: u16, delev_to: u16, delev_segment_ratio: f64) -> u16 {
     (((level / delev_segment) * (delev_segment - delev_to)) as f64 * (delev_segment_ratio / 100.0)).ceil() as u16 + delev_to
+}
+
+pub(crate) fn append_for_details_or_check_log(text: &mut String, details: u8, cfg: &Cfg) -> Result<()> {
+    if cfg.verbose >= details {
+        write!(text, ":")?;
+    } else {
+        write!(
+            text,
+            ", add {:v<details$}{} for details",
+            "-",
+            if cfg.no_log { "" } else { " or check log" },
+            details = details as usize + 1,
+        )?;
+    }
+    Ok(())
 }

@@ -93,13 +93,27 @@ pub(super) struct Options {
     pub(super) settings: Option<String>,
     /// Write default program settings file and exit.
     ///
-    /// Use this option if you keep using the same arguments. Modify default settings to suit your needs. Allows modifiying program behaviour even more, e.g. changing output plugin header, colors of messages or paths used for game configuration file auto-discovery.
+    /// Use this option if you keep using the same arguments. Modify default settings to suit your needs. Allows modifiying program behaviour even more, e.g. changing output plugin header, colors of messages or paths used for game configuration file auto-discovery. Use --settings-comments to make settings file verbose.
     ///
-    /// File will be created in program directory with name "<program_name>.toml" by default. Backup of old settings file will be saved with ".backup" extension. Use --settings to provide another path. Keep in mind that non-default settings file path should be explicitly provided every time you want to use it.
+    /// File will be created in program directory with name "<program_name>.toml" by default. Backup of old settings file will be saved with ".backup" extension.
     ///
-    /// Conflicts with all options except --settings, --log, --no-log, --color, --no-backup.
+    /// Use --settings to provide another path. Keep in mind that non-default settings file path should be explicitly provided every time you want to use it.
+    ///
+    /// Conflicts with all options except --settings, --settings-comments, --log, --no-log, --color, --no-backup.
     #[arg(long, aliases = ["settings_write", "write-settings", "write_settings"], help = "Write default program settings file and exit")]
     pub(super) settings_write: bool,
+    /// Add comments to program settings file.
+    ///
+    /// Comments make settings file text more understandable but also ~3 times longer, thus disabled by default.
+    ///
+    /// Requires --settings-write.
+    #[arg(
+        requires = "settings_write",
+        long,
+        aliases = ["settings_comments", "comments-settings", "comments_settings", "comments"],
+        help = "Add comments to program settings file"
+    )]
+    pub(super) settings_comments: bool,
     /// Do not make backups.
     ///
     /// By default output plugins, log file and settings file are backed up before rewriting.
@@ -749,7 +763,243 @@ pub(super) struct Options {
         aliases = ["compare_common", "common-compare", "common_compare"],
         help = "Compare common records only")]
     pub(super) compare_common: bool,
-    /// Show more information. May be provided twice for extra effect.
+    /// Do not make multipatch.
+    ///
+    /// Multipatch is enabled by default. It consists of --cellnames, --fogbug and --summons.
+    ///
+    /// Conflicts with other multipatch options.
+    #[arg(
+        help_heading = "Multipatch",
+        conflicts_with = "settings_write",
+        short = 'P',
+        long,
+        aliases = ["no_multipatch", "multipatch-no", "mulitpatch_no", "skip-multipatch", "skip_multipatch", "multipatch-skip", "mulitpatch_skip"],
+        help = "Do not make multipatch"
+    )]
+    pub(super) no_multipatch: bool,
+    /// Merge cell names.
+    ///
+    /// Quote from tes3cmd:
+    /// "Creates a patch to ensure renamed cells are not accidentally reverted to their original name.
+    ///
+    /// This solves the following plugin conflict that causes bugs:
+    /// * Master A names external CELL (1, 1) as: "".
+    /// * Plugin B renames CELL (1, 1) to: "My City".
+    /// * Plugin C modifies CELL (1, 1), using the original name "", reverting
+    ///   renaming done by plugin B.
+    /// * References in plugin B (such as in scripts) that refer to "My City" break."
+    #[arg(
+        help_heading = "Multipatch",
+        conflicts_with_all = ["settings_write", "no_multipatch"],
+        long,
+        help = "Merge cell names",
+        verbatim_doc_comment
+    )]
+    pub(super) cellnames: bool,
+    /// Adjust zero fog density.
+    ///
+    /// This patch is not required by OpenMW, though would not hurt.
+    ///
+    /// Quote from tes3cmd:
+    /// "Some video cards are affected by how Morrowind handles a fog density setting
+    /// of zero in interior cells with the result that the interior is pitch black,
+    /// except for some light sources, and no amount of light, night-eye, or gamma
+    /// setting will make the interior visible. This is known as the "fog bug".
+    ///
+    /// This option creates a patch that fixes all fogbugged cells in your active
+    /// plugins by setting the fog density of those cells to a non-zero value."
+    #[arg(
+        help_heading = "Multipatch",
+        conflicts_with_all = ["settings_write", "no_multipatch"],
+        long,
+        help = "Adjust zero fog density",
+        verbatim_doc_comment
+    )]
+    pub(super) fogbug: bool,
+    /// Mark known summons as persistent.
+    ///
+    /// This patch is not required by OpenMW or Morrowind with MCP, though would not hurt.
+    ///
+    /// "There is a bug in Morrowind that can cause the game to crash if you leave a
+    /// cell where an NPC has summoned a creature. The simple workaround is to flag
+    /// summoned creatures as persistent. The Morrowind Patch Project implements
+    /// this fix, however other mods coming later in the load order often revert it.
+    /// This option to the multipatch ensures that known summoned creatures are
+    /// flagged as persistent. The Morrowind Code Patch also fixes this bug, making
+    /// this feature redundant."
+    #[arg(
+        help_heading = "Multipatch",
+        conflicts_with_all = ["settings_write", "no_multipatch"],
+        long,
+        alias = "summon",
+        help = "Mark known summons as persistent",
+        verbatim_doc_comment
+    )]
+    pub(super) summons: bool,
+    /// TODO
+    #[arg(
+        hide = true,
+        help_heading = "Multipatch",
+        conflicts_with_all = ["settings_write", "no_multipatch"],
+        long,
+        help = "TODO"
+    )]
+    pub(super) primitive: bool,
+    /// TODO
+    #[arg(
+        hide = true,
+        help_heading = "Merge",
+        conflicts_with = "settings_write",
+        long,
+        aliases = ["no_merge", "merge-no", "merge_no"],
+        help = "TODO"
+    )]
+    pub(super) no_merge: bool,
+    /// TODO
+    ///
+    /// Conflicts with --no-merge.
+    #[arg(
+        hide = true,
+        help_heading = "Merge",
+        conflicts_with_all = ["settings_write", "no_merge"],
+        short = 'm',
+        long,
+        visible_alias = "merge",
+        aliases = ["merge_types", "merge-type", "merge_type", "types-merge", "types_merge", "type-merge", "type_merge", "types", "type", "merge"],
+        value_name = "TODO",
+        num_args = 1..,
+        value_delimiter = ' ',
+        help = "TODO"
+    )]
+    pub(super) merge_types: Option<Vec<String>>,
+    /// TODO
+    ///
+    /// Conflicts with --no-merge.
+    #[arg(
+        hide = true,
+        help_heading = "Merge",
+        conflicts_with_all = ["settings_write", "no_merge"],
+        short = 'M',
+        long,
+        visible_alias = "skip-merge",
+        aliases = ["merge-skip", "merge_skip", "merge-skip-type", "merge_skip_type", "merge_skip_types", "skip-merge", "skip_merge", "skip-merge-type", "skip_merge_type", "skip-merge-types", "skip_merge_types", "skip-types", "skip-type", "skip_types", "skip_type", "types-skip", "type-skip", "types_skip", "type_skip"],
+        value_name = "TODO(S)",
+        num_args = 1..,
+        value_delimiter = ' ',
+        help = "TODO"
+    )]
+    pub(super) merge_skip_types: Option<Vec<String>>,
+    /// Do not treat flags as lists.
+    ///
+    /// Flags come together as they are represented with a single number, unlike lists that have dedicated subrecords for each element. The program treats flags as lists by default. It's a rare situation for the --interdependent-flags to have different result though. Following example illustrates the difference:
+    ///  MGEF Flags(plugin 1): (ALLOW_SPELLMAKING, ALLOW_ENCHANTING)
+    ///  MGEF Flags(plugin 2): (ALLOW_SPELLMAKING)
+    ///  MGEF Flags(plugin 3): (ALLOW_SPELLMAKING, ALLOW_ENCHANTING, HARMFUL)
+    ///  default merge result: (ALLOW_SPELLMAKING, HARMFUL)
+    ///  interdependent flags: (ALLOW_SPELLMAKING, ALLOW_ENCHANTING, HARMFUL)
+    #[arg(
+        help_heading = "Multipatch",
+        conflicts_with = "settings_write",
+        long,
+        visible_alias = "if",
+        aliases = ["interdependent_flags", "flags-interdependent", "flags_interdependent"],
+        help = "Do not treat flags as lists",
+        verbatim_doc_comment
+    )]
+    pub(super) interdependent_flags: bool,
+    /// Do not hide unchanged atmosphere data elements.
+    ///
+    /// Atmosphere data(AMBI) consists of 4 values. By default only changed values are shown to make log output more readable.
+    ///
+    /// Example:
+    ///   AMBI_1: ambient: (0,0,0), sunlight: (0,0,0), fog: (0,0,0), fog_density: 0
+    ///   AMBI_2: ambient: (0,0,0), sunlight: (0,0,0), fog: (0,0,0), fog_density: 0.01
+    ///
+    ///   Output log would have very long line with both strings with this option. Output is more compact by default though:
+    ///       fog_density: "0" -> "0.01"
+    #[arg(
+        help_heading = "Multipatch",
+        conflicts_with = "settings_write",
+        long,
+        visible_alias = "vad",
+        aliases = ["verbose_atmosphere_data", "verbose-ambi", "verbose_ambi", "atmosphere-data-verbose", "atmosphere_data_verbose", "ambi-verbose", "ambi_verbose"],
+        help = "Do not hide unchanged atmosphere data elements",
+        verbatim_doc_comment
+    )]
+    pub(super) verbose_atmosphere_data: bool,
+    /// Do not sync secondary fog density with primary fog density.
+    ///
+    /// TES3 mod format is redundant sometimes. Fog density is kept in 2 places: AMBI and DATA. Secondary value in DATA is probably unused by engines. This option's impact is insignificant on the resulting output, though may be used to make output a little bit smaller.
+    #[arg(
+        help_heading = "Multipatch",
+        conflicts_with = "settings_write",
+        long,
+        visible_alias = "isfd",
+        aliases = ["ignore_secondary_fog_density", "secondary-fog-density-ignore", "secondary_fog_density_ignore", "ignore-secondary-fog", "ignore_secondary_fog", "secondary-fog-ignore", "secondary_fog_density"],
+        help = "Do not sync secondary fog density with primary fog density"
+    )]
+    pub(super) ignore_secondary_fog_density: bool,
+    /// Do not make output slightly smaller.
+    ///
+    /// Program omits redundant values from result by default. It is only applicable to CELL records and mesh field in NPC_ records though.
+    /// Example:
+    ///     CELL water level(plugin 1): 100
+    ///     CELL water level(plugin 2): 200
+    ///     Merged CELL water level:
+    ///         "200" with this option.
+    ///         "None" by default. That means field was omitted. Engine would use water level from plugin 2.
+    #[arg(
+        help_heading = "Multipatch",
+        conflicts_with = "settings_write",
+        long,
+        visible_alias = "krv",
+        aliases = ["keep_redundant_values", "redundant-values-keep", "redundant_values_keep", "keep-redundant", "keep_redundant", "redundant-keep", "redundant_keep"],
+        help = "Do not make output slightly smaller",
+        verbatim_doc_comment
+    )]
+    pub(super) keep_redundant_values: bool,
+    /// Reverse list changes order.
+    ///
+    /// It's just a matter of taste whether removing or adding elements should come first.
+    ///
+    /// Example:
+    ///   Default:
+    ///     "inventory": - "daedric dai-katana"(1) ["There Can Be Only One (Alt Fyr 2).esp"]
+    ///     "inventory": + "glass claymore"(1) ["There Can Be Only One (Alt Fyr 2).esp"]
+    ///   This option:
+    ///     "inventory": + "glass claymore"(1) ["There Can Be Only One (Alt Fyr 2).esp"]
+    ///     "inventory": - "daedric dai-katana"(1) ["There Can Be Only One (Alt Fyr 2).esp"]
+    #[arg(
+        help_heading = "Multipatch",
+        conflicts_with = "settings_write",
+        long,
+        visible_alias = "pbm",
+        aliases = ["plus_before_minus", "minus-after-plus", "minus_after_plus"],
+        help = "Reverse list changes order",
+        verbatim_doc_comment
+    )]
+    pub(super) plus_before_minus: bool,
+    /// Set travel destination similarity threshold.
+    ///
+    /// This value helps the program to assume which travel destinations are the same destination with slightly changed coordinates though.
+    ///
+    /// Example:
+    ///   DODT(plugin 1): (-174024.39,136823.95,457.66833)
+    ///   DODT(plugin 2): (-173814.48,136843.92,448.3752)
+    ///
+    ///   By default merged record would have only the second value. With this option set to 0 there would be both destinations. Nothing game breaking but doesn't look nice. Very rare condition actually.
+    #[arg(
+        help_heading = "Multipatch",
+        conflicts_with = "settings_write",
+        long,
+        visible_alias = "ds",
+        aliases = ["destination_similarity", "similarity-destination", "similarity_destination", "destination-similar", "destination_similar", "similar-destination", "similar_destination", "dest-similarity", "dest_similarity", "similarity-dest", "similarity_dest", "dest-similar", "dest_similar", "similar-dest", "similar_dest"],
+        help = "Set travel destination similarity threshold",
+        value_name = "1024",
+        value_parser = clap::value_parser!(u32).range(0..8192)
+    )]
+    pub(super) destination_similarity: Option<u32>,
+    /// Show more information. May be provided multiple times for extra effect.
     ///
     /// Conflicts with --quiet.
     #[arg(
@@ -772,6 +1022,18 @@ pub(super) struct Options {
         help = "Do not show anything"
     )]
     pub(super) quiet: bool,
+    /// Show debug information. May be provided multiple times for extra effect.
+    ///
+    /// Debug messages are placed into the log file. They are shown on screen when --verbose >= --debug, e.g. '-v -uuu' shows only debug level 1 messages on screen.
+    #[arg(
+        help_heading = "Display output",
+        conflicts_with = "settings_write",
+        short = 'u',
+        long,
+        action = clap::ArgAction::Count,
+        help = "Show debug information"
+    )]
+    pub(super) debug: u8,
     /// Show plugins reading progress.
     #[arg(
         help_heading = "Display output",
@@ -862,6 +1124,7 @@ fn arg_get_help(arg: &Arg) -> Result<StyledStr> {
 
 fn check_long_arg_names_and_aliases(string: &str, command: &clap::Command) -> Result<()> {
     let mut string = string.to_lowercase().replace('-', "_");
+    #[allow(clippy::assigning_clones)]
     if let Some(stripped) = string.strip_prefix("__") {
         string = stripped.to_owned();
     }

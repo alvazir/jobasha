@@ -1,4 +1,4 @@
-use super::{select_placed, Helper, Levc, Levi, ListDiffStats};
+use super::{select_placed, ComparePlugins, RawPlugins};
 use crate::{msg, Cfg, ComparePlugin, ListCounts, Log, MsgTone, OutputFile, PluginKind};
 use anyhow::{anyhow, Context, Result};
 use std::{
@@ -7,36 +7,53 @@ use std::{
 };
 use tes3::esp::{Header, LeveledCreature, LeveledItem, Plugin, TES3Object};
 
-pub(super) fn compare_plugins(h: &mut Helper, cfg: &Cfg, log: &mut Log) -> Result<()> {
+pub(super) type Levc<'a> = HashMap<String, (usize, &'a LeveledCreature)>;
+pub(super) type Levi<'a> = HashMap<String, (usize, &'a LeveledItem)>;
+
+#[derive(Default)]
+pub(super) struct ListDiffStats {
+    pub(super) added: usize,
+    pub(super) removed: usize,
+    pub(super) changed: usize,
+}
+
+pub(super) fn compare_plugins(
+    raw: &RawPlugins,
+    cmp: &ComparePlugins,
+    counts: &ListCounts,
+    exit_code: &mut i32,
+    cfg: &Cfg,
+    log: &mut Log,
+) -> Result<()> {
     let mut plugins_differ = 0;
     if !cfg.no_compare {
         let mut new = if !cfg.compare_only {
-            &h.merge.plugin
+            &raw.merge.plugin
         } else {
-            &h.compare.previous.plugin
+            &cmp.previous.plugin
         };
         let (mut old, mut old_name) = if cfg.compare_with.is_empty() {
-            (&h.compare.previous, "")
+            (&cmp.previous, "")
         } else {
-            (&h.compare.compare_with, cfg.compare_with.as_ref())
+            (&cmp.compare_with, cfg.compare_with.as_ref())
         };
         let mut merge_changed = false;
         #[rustfmt::skip]
-        compare_plugin(new, old, old_name, &cfg.output, &h.counts, &mut merge_changed, &mut plugins_differ, cfg, log)
+        compare_plugin(new, old, old_name, &cfg.output, counts, &mut merge_changed, &mut plugins_differ, cfg, log)
             .with_context(|| plugin_compare_failure_msg(&cfg.output.name, old_name))?;
         if cfg.delev && cfg.delev_distinct {
-            new = &h.delev.plugin;
+            new = &raw.delev.plugin;
             (old, old_name) = if cfg.compare_delev_with.is_empty() {
-                (&h.compare.delev_previous, "")
+                (&cmp.delev_previous, "")
             } else {
-                (&h.compare.delev_compare_with, cfg.compare_delev_with.as_ref())
+                (&cmp.delev_compare_with, cfg.compare_delev_with.as_ref())
             };
             #[rustfmt::skip]
-            compare_plugin(new, old, old_name, &cfg.delev_output, &h.counts, &mut merge_changed, &mut plugins_differ, cfg, log)
+            compare_plugin(new, old, old_name, &cfg.delev_output, counts, &mut merge_changed, &mut plugins_differ, cfg, log)
                 .with_context(|| plugin_compare_failure_msg(&cfg.delev_output.name, old_name))?;
         }
         if cfg.compare_only && plugins_differ != 0 {
-            h.exit_code = 3;
+            *exit_code = 3;
         }
     }
     Ok(())
@@ -89,7 +106,7 @@ fn compare_plugin(
         msg(plugin_compare_msg(&output.name, old_name, false), MsgTone::Ugly, 0, cfg, log)?;
         msg("", MsgTone::Neutral, level, cfg, log)?;
         if !header_diff.is_empty() {
-            let tab1 = &cfg.guts.compare_tab_l1;
+            let tab1 = &cfg.guts.tab_l1;
             msg(format!("{tab1}Plugin header(TES3, old -> new):"), MsgTone::Neutral, 0, cfg, log)?;
             msg(&header_diff[..header_diff.len() - 1], MsgTone::Neutral, 0, cfg, log)?;
             msg("", MsgTone::Neutral, level, cfg, log)?;
@@ -162,7 +179,7 @@ fn is_empty(
 ) -> Result<bool> {
     let mut prefix = "";
     let mut infix = "";
-    if select_placed(output, counts, cfg) == 0 {
+    if select_placed(output, counts, cfg) == 0 && new_plugin.objects.len() < 2 {
         (prefix, infix) = ("Unable to compare absent", "plugin with");
     } else if new_plugin.objects.len() < 2 {
         (prefix, infix) = ("Unable to compare empty", "plugin with");
@@ -206,7 +223,7 @@ fn compare_headers(
         TES3Object::Header(new_header) => match &old.plugin.objects[0] {
             TES3Object::Header(old_header) => {
                 if new_header != old_header {
-                    let tab = &cfg.guts.compare_tab_l2;
+                    let tab = &cfg.guts.tab_l2;
                     if new_header.num_objects != old_header.num_objects {
                         writeln!(diff, "{tab}~ Records {} -> {}", old_header.num_objects, new_header.num_objects,)?;
                     };
@@ -315,7 +332,7 @@ fn check_multiple_lists_with_same_name(
     if levc.len() != c_count || levi.len() != i_count {
         let mut text = format!(
             "{}Bug: multiple lists with the same name found in {:?}:\n",
-            &cfg.guts.compare_tab_l1, output.name
+            &cfg.guts.tab_l1, output.name
         );
         macro_rules! get_multi {
             ($kind:ident) => {
@@ -329,7 +346,7 @@ fn check_multiple_lists_with_same_name(
         for (mut lists, kind) in [get_multi!(levc), get_multi!(levi)].into_iter().zip(["LEVC", "LEVI"].iter()) {
             lists.sort();
             for (name, count) in lists.iter() {
-                writeln!(text, "{}{kind}({}): {:?}", &cfg.guts.compare_tab_l2, count, name)?;
+                writeln!(text, "{}{kind}({}): {:?}", &cfg.guts.tab_l2, count, name)?;
             }
         }
         msg(text, MsgTone::Bad, 0, cfg, log)?;
@@ -346,9 +363,9 @@ fn compare_lists(
 ) -> Result<(String, String, String, String)> {
     let (mut diffc, mut diffi, mut shortc, mut shorti) = (String::new(), String::new(), String::new(), String::new());
     let (mut statc, mut stati) = (ListDiffStats::default(), ListDiffStats::default());
-    let tab1 = &cfg.guts.compare_tab_l1;
-    let tab2 = &cfg.guts.compare_tab_l2;
-    let tab3 = &cfg.guts.compare_tab_l3;
+    let tab1 = &cfg.guts.tab_l1;
+    let tab2 = &cfg.guts.tab_l2;
+    let tab3 = &cfg.guts.tab_l3;
     let mut objects: HashMap<String, Vec<&(String, u16)>> = HashMap::new();
     let mut remaining_objects: Vec<(u16, String, &String)> = Vec::new();
     let (mut old_levc, mut old_levi, old_c_count, old_i_count) = get_list_indexes(&old.plugin);
@@ -416,7 +433,6 @@ fn compare_lists(
                                                             "{tab3}~ {} {:?} [{} -> {}]",
                                                             $name, old_creature.0, old_creature.1, new_level
                                                         )?;
-                                                        // $name, old_creature.0, new_level, old_creature.1
                                                     }
                                                 } else {
                                                     if old_creature.1 != object[0].1 {
@@ -426,7 +442,6 @@ fn compare_lists(
                                                             "{tab3}~ {} {:?} [{} -> {}]",
                                                             $name, old_creature.0, old_creature.1, object[0].1
                                                         )?;
-                                                        // $name, old_creature.0, object[0].1, old_creature.1
                                                     }
                                                     objects.remove(&old_low);
                                                 }

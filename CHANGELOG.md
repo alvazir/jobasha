@@ -3,6 +3,41 @@
 <!-- markdownlint-disable MD036 -->
 # Changelog
 
+## 0.6.0 (2025-01-02)
+
+New features
+
+* Add multipatch similar to tes3cmd, TES3Merge etc:
+  * `--no-multipatch`(short `-P`) to disable.
+  * Individual patches may be selected with corresponding options:
+    * `--cellnames` makes sure that renamed cells are not renamed back by accident.
+    * `--fogbug` sets fog density to a small value for fogbugged cells(0 fog density).
+    * `--summons` sets persistent flag for known summons.
+  * Add several options that slightly change logic of multipatching or log format.
+* Add `--debug`(short `-u`) option to show debug information. It may be provided multiple times similar to `--verbose`:
+  * `-uuuuuu` would put a lot of debug information to a log file.
+* Add `--settings-comments` to add comments to a settings file when creating it with `--settings-write`.
+
+Feature enhancements
+
+* Allow ignoring empty or corrupted plugins with `--ignore-errors`(thanks to Falc77 for report).
+* Make settings file much shorter by default(new option `--settings-comments` should be used to return comments).
+
+Fixes
+
+* Show error and quit when settings file passed with `--settings` option doesn't exist. Previously program silently ignored the error.
+
+Miscellaneous
+
+* Improve performance by ~20% by offloading dropping unused objects to another thread.
+* Update dependencies, settings version.
+* Code refactoring.
+* State proper MSRV in Cargo.toml and README instead of current Rust version.
+* Binary downloads page:
+  * Add `Win7` Windows build to be used with Windows 7+ because Rust [1.78+ requires Windows 10+](https://releases.rs/docs/1.78.0/#compiler).
+  * Drop `GNU` Windows build because it's not needed.
+  * Remove `-msvc` suffix from Windows 10+ build's folder.
+
 ## 0.5.0 (2024-01-30)
 
 **Breaking changes**
@@ -11,7 +46,7 @@
 
 New features
 
-* Add `--delev-random`(short `r`) to delevel to a random level between original and target levels.
+* Add `--delev-random`(short `-r`) to delevel to a random level between original and target levels.
 * Skip multipatch.esp(tes3cmd) by default(optional).
 * Make program halt at the end and wait for keypress when run without arguments. That's primarily done to prevent terminal window immediately closing when run in Windows by double-click(thanks to Walkihr for feedback).
 
@@ -38,11 +73,11 @@ New features
 * Add `--compare-only` option to only compare 2 plugins without merging anything.
 * Add `--compare-common` option to only show changes to common Masters and Lists.
 * Add several options to allow more complicated deleveling. Check help for examples:
-  * `--delev-segment`(short `g`) to make partial deleveling for subrecords with level greater or equal to the value. Example usage: you want to delevel almost everything to level 1, but don't want to encounter anything 21+ at level 1. Passing `--delev-segment 21` would make anything 21+ to be deleveled to 11 minimum by default(roughly halved). Formula is:
+  * `--delev-segment`(short `-g`) to make partial deleveling for subrecords with level greater or equal to the value. Example usage: you want to delevel almost everything to level 1, but don't want to encounter anything 21+ at level 1. Passing `--delev-segment 21` would make anything 21+ to be deleveled to 11 minimum by default(roughly halved). Formula is:
     * new-level = delev-to + (delev-segment - delev-to) * (delev-segment-ratio / 100%)
       * default value for delev-to is 1
       * default value for delev-segment-ratio is 50%
-  * `--delev-segment-progressive`(short `G`) to make multiple equal segments, e.g. 21+, 41+ etc.
+  * `--delev-segment-progressive`(short `-G`) to make multiple equal segments, e.g. 21+, 41+ etc.
   * `--delev-segment-ratio`(defaults to 50%) to set minimal level to delevel to for the segment.
 
 Fixes

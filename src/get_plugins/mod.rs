@@ -13,7 +13,7 @@ use get_game_config::get_game_config;
 mod get_plugins_to_compare;
 pub(crate) use get_plugins_to_compare::get_plugins_to_compare;
 
-#[derive(PartialEq)]
+#[derive(Default, PartialEq, PartialOrd, Eq, Ord)]
 pub(crate) struct PluginInfo {
     pub(crate) name: String,
     pub(crate) name_lowercased: String,
@@ -49,7 +49,7 @@ pub(super) fn get_plugins(cfg: &Cfg, log: &mut Log) -> Result<Vec<PluginInfo>> {
     let mut helper: Helper = Helper::default();
     let mut omw_data_dirs: Vec<(usize, PathBuf)> = Vec::new();
     let mut omw_all_plugins: HashMap<String, PathBuf> = HashMap::new();
-    for line in config_lines.flatten() {
+    for line in config_lines.map_while(Result::ok) {
         if !helper.omw_found && line.starts_with(&cfg.guts.mor_line_beginning_content) {
             if !helper.mor_data_files_dir_found {
                 mor_get_data_files_dir(&config_path, &mut helper, cfg)

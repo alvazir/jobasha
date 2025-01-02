@@ -14,6 +14,7 @@ Jobasha will perfectly organize all your lists in his library. It is a [command 
 * [Merge leveled lists](https://en.uesp.net/wiki/Morrowind_Mod:Leveled_Lists#List_Merging)  
 * Delete subrecords from merged leveled lists  
 * Delevel subrecords  
+* Create multipatch  
 * Compare leveled lists between plugins  
 * Process both **Morrowind.ini** and **openmw.cfg**  
 * Show detailed information  
@@ -60,6 +61,7 @@ Jobasha will perfectly organize all your lists in his library. It is a [command 
     -L, --no-log                Do not write log
     -s, --settings <PATH>       Name of the program settings file
         --settings-write        Write default program settings file and exit
+        --settings-comments     Add comments to program settings file
         --no-backup             Do not make backups
         --ignore-errors         Ignore non-critical errors
     -?, --help-option <OPTION>  Print help for the specific option
@@ -114,9 +116,22 @@ Jobasha will perfectly organize all your lists in his library. It is a [command 
         --compare-delev-with <PATH>  Plugin to compare delev output plugin with
         --compare-common             Compare common records only [aliases: common]
 
+  Multipatch:
+    -P, --no-multipatch                  Do not make multipatch
+        --cellnames                      Merge cell names
+        --fogbug                         Adjust zero fog density
+        --summons                        Mark known summons as persistent
+        --interdependent-flags           Do not treat flags as lists [aliases: if]
+        --verbose-atmosphere-data        Do not hide unchanged atmosphere data elements [aliases: vad]
+        --ignore-secondary-fog-density   Do not sync secondary fog density with primary fog density [aliases: isfd]
+        --keep-redundant-values          Do not make output slightly smaller [aliases: krv]
+        --plus-before-minus              Reverse list changes order [aliases: pbm]
+        --destination-similarity <1024>  Set travel destination similarity threshold [aliases: ds]
+
   Display output:
     -v, --verbose...              Show more information
     -q, --quiet                   Do not show anything
+    -u, --debug...                Show debug information
     -B, --progress                Show plugins reading progress
     -b, --progress-bar            Show plugins reading progress bar [aliases: bar]
     -p, --color                   Show colored output [aliases: pretty]
@@ -157,7 +172,7 @@ Please see the [CHANGELOG](CHANGELOG.md) for a release history.
 
 ## Releases
 
-[Binary downloads](https://www.nexusmods.com/morrowind/mods/52707) are available for GNU/Linux(x86-64(GLIBC, MUSL)), Android(AArch64), Windows(x86-64(MSVC, GNU)), macOS(x86-64, AArch64).
+[Binary downloads](https://www.nexusmods.com/morrowind/mods/52707) are available for GNU/Linux(x86-64(GLIBC, MUSL)), Android(AArch64), Windows(x86-64(Win10+, Win7+)), macOS(x86-64, AArch64).
 
 ## System requirements
 

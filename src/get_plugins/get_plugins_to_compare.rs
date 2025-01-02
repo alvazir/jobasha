@@ -29,7 +29,11 @@ pub(crate) fn get_plugins_to_compare(cfg: &Cfg, log: &mut Log) -> Result<Compare
         if !cfg.compare_only {
             (path, comp, purpose) = (&cfg.output.path, &mut compare_plugins.previous, "previous output");
         } else {
-            (path, comp, purpose) = (&Path::new(&cfg.compare_only_name), &mut compare_plugins.previous, "TODO");
+            (path, comp, purpose) = (
+                &Path::new(&cfg.compare_only_name),
+                &mut compare_plugins.previous,
+                "\"--compare-only\"",
+            );
         }
         get_plugin_to_compare(path, comp, purpose, true, cfg, log)?;
         if cfg.delev && cfg.delev_distinct {

@@ -1,6 +1,6 @@
 [package]
 name = "jobasha"
-version = "0.5.0"
+version = "0.6.0"
 authors = ["alvazir <basha.alvazir@gmail.com>"]
 edition = "2021"
 rust-version = "1.75.0"
@@ -9,7 +9,7 @@ readme = "README.md"
 homepage = "https://www.nexusmods.com/morrowind/mods/52707"
 repository = "https://github.com/alvazir/jobasha"
 license = "GPL-3.0-or-later"
-keywords = ["cli", "tes3", "morrowind", "openmw"]
+keywords = ["TES3", "Morrowind", "OpenMW", "CLI"]
 categories = ["command-line-utilities", "game development"]
 publish = false
 
@@ -19,36 +19,44 @@ maintenance = { status = "actively-developed" }
 [dependencies.tes3]
 # path = "../tes3"
 git = "https://github.com/Greatness7/tes3"
-rev = "de4b633"
+rev = "4d4df74"
 # branch = "dev"
 default-features = false
 features = ["esp"]
 
 [dependencies]
 # CLI
-clap = { version = "~4.4.18", features = ["derive", "suggestions", "wrap_help"] }
+clap = { version = "~4.5.23", features = ["derive", "suggestions", "wrap_help"] }
 # settings file
-confique = { version = "~0.2.5", default-features = false, features = ["toml"] }
-# required by confique
-serde = "~1.0.196"
+confique = { version = "~0.3.0", default-features = false, features = ["toml"] }
 # error management
-anyhow = "~1.0.79"
+anyhow = "~1.0.95"
 # find openmw.cfg
 dirs = "~5.0.1"
 # find files in parallel
-rayon = "~1.8.1"
+rayon = "~1.10.0"
 # better fs errors
-fs-err = "~2.11.0"
+fs-err = "~3.0.0"
+# references processing
+hashbrown = { version = "~0.14.5", features = ["rayon"] }
 # colored output
-console = "~0.15.8"
+console = "~0.15.10"
 # progress bar
-indicatif = "~0.17.7"
+indicatif = "~0.17.9"
 # get date to put into result's name
-chrono = "~0.4.33"
+chrono = "~0.4.39"
 # delev to random level
 rand = "~0.8.5"
+# construct idents in macros dealing with (almost)all the tes3 record types
+paste = "~1.0.15"
 # memory usage
-# peak_alloc = "~0.2.0" # disabled due to slowing down the program
+# peak_alloc = "~0.2.1" # disabled due to slowing down the program
+
+[dev-dependencies]
+pretty_assertions = "~1.4.1"
+
+[profile.dev]
+debug = 0
 
 [profile.release-lto]
 inherits = "release"
@@ -59,7 +67,7 @@ codegen-units = 1
 
 [profile.release-lto-darwin]
 inherits = "release"
-# strip = true
+strip = false
 lto = true
 panic = "abort"
 codegen-units = 1

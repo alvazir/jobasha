@@ -1,30 +1,36 @@
-use super::{select_placed, Helper};
+use super::{select_placed, ComparePlugins, RawPlugins};
 use crate::{get_plugin_size, msg, Cfg, ComparePlugin, ListCounts, Log, MsgTone, OutputFile, PluginKind};
 use anyhow::{anyhow, Context, Result};
 use fs_err::{create_dir_all, rename};
 use std::path::Path;
 use tes3::esp::{Plugin, TES3Object};
 
-pub(super) fn write_plugins(h: &mut Helper, cfg: &Cfg, log: &mut Log) -> Result<()> {
+pub(super) fn write_plugins(
+    raw: &mut RawPlugins,
+    cmp: &mut ComparePlugins,
+    counts: &mut ListCounts,
+    cfg: &Cfg,
+    log: &mut Log,
+) -> Result<()> {
     if cfg.dry_run {
         return Ok(());
     }
     let mut merge_was_written = false;
     write_plugin(
-        &mut h.merge.plugin,
-        &mut h.counts,
+        &mut raw.merge.plugin,
+        counts,
         &cfg.output,
-        &mut h.compare.previous,
+        &mut cmp.previous,
         &mut merge_was_written,
         cfg,
         log,
     )?;
     if cfg.delev_distinct {
         write_plugin(
-            &mut h.delev.plugin,
-            &mut h.counts,
+            &mut raw.delev.plugin,
+            counts,
             &cfg.delev_output,
-            &mut h.compare.delev_previous,
+            &mut cmp.delev_previous,
             &mut merge_was_written,
             cfg,
             log,
@@ -42,7 +48,7 @@ fn write_plugin(
     cfg: &Cfg,
     log: &mut Log,
 ) -> Result<()> {
-    if select_placed(output, counts, cfg) == 0 {
+    if select_placed(output, counts, cfg) == 0 && plugin.objects.len() < 2 {
         let text = format!(
             "Everything is great right now, there is nothing to place into plugin \"{}\"",
             output.name

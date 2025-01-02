@@ -1,34 +1,166 @@
-use super::{DeletedSubrecords, DeleveledSubrecords, Messages, ThresholdMessageKind, ThresholdMessages, UntouchedList};
-use crate::{msg, plural, Cfg, ListCounts, Log, MsgTone};
+use crate::{append_for_details_or_check_log, msg, plural, Cfg, ListCounts, LlElement, Log, MsgTone, PluginName, ResponsiblePlugins};
 use anyhow::{anyhow, Result};
 use std::{cmp::max, fmt::Write as _};
 
-pub(crate) fn show_messages(m: &Messages, counts: &ListCounts, exit_code: &mut i32, cfg: &Cfg, log: &mut Log) -> Result<()> {
-    let mut text = match create_text_with_enough_capacity(m, counts, cfg) {
-        Ok(Some(text)) => text,
-        Ok(None) => return Ok(()),
-        Err(_) => return Err(anyhow!("Bug: messages list contains nothing")),
-    };
-    if !m.deleted_subrecords.is_empty() {
-        show_deleted_subrecords(&mut text, &m.deleted_subrecords, counts.merge.deleted_subrecord, cfg, log)?;
+pub(crate) struct LlMessages<'a> {
+    pub(crate) threshold_resolved: ThresholdMessages<'a>,
+    pub(crate) threshold_skipped: ThresholdMessages<'a>,
+    pub(crate) threshold_warnings: ThresholdMessages<'a>,
+    pub(crate) untouched_lists: Vec<UntouchedList<'a>>,
+    pub(crate) deleted_subrecords: Vec<DeletedSubrecords<'a>>,
+    pub(crate) deleveled_subrecords: Vec<DeleveledSubrecords<'a>>,
+}
+
+impl<'a> LlMessages<'a> {
+    pub(crate) fn new() -> LlMessages<'a> {
+        LlMessages {
+            threshold_resolved: ThresholdMessages::new(ThresholdMessageKind::Resolved),
+            threshold_skipped: ThresholdMessages::new(ThresholdMessageKind::Skipped),
+            threshold_warnings: ThresholdMessages::new(ThresholdMessageKind::Warning),
+            untouched_lists: Vec::new(),
+            deleted_subrecords: Vec::new(),
+            deleveled_subrecords: Vec::new(),
+        }
     }
-    if !m.untouched_lists.is_empty() {
-        show_untouched_lists(&mut text, &m.untouched_lists, cfg, log)?;
+
+    pub(crate) fn exit_code(&self) -> i32 {
+        if self.threshold_warnings.is_empty() {
+            0
+        } else {
+            2
+        }
     }
-    if !m.threshold_resolved.is_empty() {
-        show_threshold_messages(&mut text, &m.threshold_resolved, cfg, log)?;
+
+    pub(crate) fn show(&self, counts: &ListCounts, cfg: &Cfg, log: &mut Log) -> Result<()> {
+        let mut text = match self.create_text_with_enough_capacity(counts, cfg) {
+            Ok(Some(text)) => text,
+            Ok(None) => return Ok(()),
+            Err(_) => return Err(anyhow!("Bug: messages list contains nothing")),
+        };
+        if !self.deleted_subrecords.is_empty() {
+            show_deleted_subrecords(&mut text, &self.deleted_subrecords, counts.merge.deleted_subrecord, cfg, log)?;
+        }
+        if !self.untouched_lists.is_empty() {
+            show_untouched_lists(&mut text, &self.untouched_lists, cfg, log)?;
+        }
+        if !self.threshold_resolved.is_empty() {
+            show_threshold_messages(&mut text, &self.threshold_resolved, cfg, log)?;
+        }
+        if !self.threshold_skipped.is_empty() {
+            show_threshold_messages(&mut text, &self.threshold_skipped, cfg, log)?;
+        }
+        if !self.threshold_warnings.is_empty() {
+            show_threshold_messages(&mut text, &self.threshold_warnings, cfg, log)?;
+        }
+        if !self.deleveled_subrecords.is_empty() {
+            show_deleveled_subrecords(&mut text, &self.deleveled_subrecords, counts.delev.deleveled_subrecord, cfg, log)?;
+        }
+        Ok(())
     }
-    if !m.threshold_skipped.is_empty() {
-        show_threshold_messages(&mut text, &m.threshold_skipped, cfg, log)?;
+
+    fn create_text_with_enough_capacity(&self, counts: &ListCounts, cfg: &Cfg) -> Result<Option<String>> {
+        match [
+            counts.merge.deleted_subrecord,
+            self.untouched_lists.len(),
+            self.threshold_resolved.messages.len(),
+            self.threshold_skipped.messages.len(),
+            self.threshold_warnings.messages.len(),
+            counts.delev.deleveled_subrecord,
+        ]
+        .iter()
+        .max()
+        {
+            Some(0) => Ok(None),
+            Some(max) => Ok(Some(String::with_capacity(cfg.guts.details_line_approximate_length * max))),
+            None => unreachable!(),
+        }
     }
-    if !m.threshold_warnings.is_empty() {
-        show_threshold_messages(&mut text, &m.threshold_warnings, cfg, log)?;
-        *exit_code = 2;
+}
+
+pub(crate) struct ThresholdMessages<'a> {
+    pub(crate) kind: ThresholdMessageKind,
+    pub(crate) messages: Vec<ThresholdMessageRaw<'a>>,
+}
+
+impl<'a> ThresholdMessages<'a> {
+    fn new(kind: ThresholdMessageKind) -> ThresholdMessages<'a> {
+        ThresholdMessages {
+            kind,
+            messages: Vec::new(),
+        }
     }
-    if !m.deleveled_subrecords.is_empty() {
-        show_deleveled_subrecords(&mut text, &m.deleveled_subrecords, counts.delev.deleveled_subrecord, cfg, log)?;
+
+    pub(crate) fn push(
+        &mut self,
+        ratio: f64,
+        threshold: f64,
+        log_t: &'a str,
+        id: String,
+        initial_plugin: PluginName<'a>,
+        delete: &[(LlElement, LlElement, ResponsiblePlugins<'a>)],
+    ) {
+        let mut plugins = Vec::new();
+        for (_, _, responsible_plugins) in delete {
+            for responsible_plugin in responsible_plugins.iter() {
+                if !plugins.contains(&responsible_plugin) {
+                    plugins.push(responsible_plugin);
+                }
+            }
+        }
+        self.messages.push(ThresholdMessageRaw {
+            ratio,
+            threshold,
+            log_t,
+            id,
+            initial_plugin,
+            responsible_plugins_str: plugins.into_iter().map(|x| x.as_str()).collect(),
+        });
     }
-    Ok(())
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.messages.is_empty()
+    }
+}
+
+pub(crate) enum ThresholdMessageKind {
+    Resolved,
+    Skipped,
+    Warning,
+}
+
+type ResponsiblePluginsStr<'a> = Vec<&'a str>;
+
+pub(crate) struct ThresholdMessageRaw<'a> {
+    pub(crate) ratio: f64,
+    pub(crate) threshold: f64,
+    pub(crate) log_t: &'a str,
+    pub(crate) id: String,
+    pub(crate) initial_plugin: PluginName<'a>,
+    pub(crate) responsible_plugins_str: ResponsiblePluginsStr<'a>,
+}
+
+pub(crate) struct DeletedSubrecords<'a> {
+    pub(crate) log_t: &'a str,
+    pub(crate) id: String,
+    pub(crate) initial_plugin: PluginName<'a>,
+    pub(crate) subrecords: Vec<(LlElement, ResponsiblePluginsStr<'a>)>,
+}
+
+pub(crate) struct UntouchedList<'a> {
+    pub(crate) log_t: &'a str,
+    pub(crate) id: String,
+    pub(crate) initial_plugin: &'a str,
+    pub(crate) last_plugin: &'a str,
+}
+
+type NewLevel = u16;
+
+#[derive(Debug)]
+pub(crate) struct DeleveledSubrecords<'a> {
+    pub(crate) log_t: &'a str,
+    pub(crate) id: String,
+    pub(crate) initial_plugin: PluginName<'a>,
+    pub(crate) subrecords: Vec<(LlElement, NewLevel)>,
 }
 
 fn show_deleted_subrecords(
@@ -228,17 +360,7 @@ fn show_deleveled_subrecords(
 }
 
 fn msg_with_details_suggestion(text: &mut String, tone: MsgTone, verbose: u8, details: u8, cfg: &Cfg, log: &mut Log) -> Result<()> {
-    let _ = if cfg.verbose >= details {
-        write!(text, ":")
-    } else {
-        write!(
-            text,
-            ", add {:v<details$}{} for details",
-            "-",
-            if cfg.no_log { "" } else { " or check log" },
-            details = details as usize + 1,
-        )
-    };
+    append_for_details_or_check_log(text, details, cfg)?;
     msg_and_clear(text, tone, verbose, cfg, log)
 }
 
@@ -246,22 +368,4 @@ fn msg_and_clear(text: &mut String, tone: MsgTone, verbose: u8, cfg: &Cfg, log: 
     msg(&text, tone, verbose, cfg, log)?;
     text.clear();
     Ok(())
-}
-
-fn create_text_with_enough_capacity(m: &Messages, counts: &ListCounts, cfg: &Cfg) -> Result<Option<String>> {
-    match [
-        counts.merge.deleted_subrecord,
-        m.untouched_lists.len(),
-        m.threshold_resolved.messages.len(),
-        m.threshold_skipped.messages.len(),
-        m.threshold_warnings.messages.len(),
-        counts.delev.deleveled_subrecord,
-    ]
-    .iter()
-    .max()
-    {
-        Some(0) => Ok(None),
-        Some(max) => Ok(Some(String::with_capacity(cfg.guts.details_line_approximate_length * max))),
-        None => unreachable!(),
-    }
 }
